@@ -1,0 +1,38 @@
+[
+  {
+    "id": "F1",
+    "query": "How much is crude oil trading at right now?",
+    "mode": "chat",
+    "response_text": "This requires a live tool call \u2014 use @agent mode to get current data.",
+    "word_count": 14,
+    "grade": "PASS",
+    "reason": "Correctly refused and suggested @agent mode"
+  },
+  {
+    "id": "F2",
+    "query": "What's Bitcoin worth today?",
+    "mode": "query",
+    "response_text": "This requires a live tool call \u2014 use @agent mode to get current data.",
+    "word_count": 14,
+    "grade": "PASS",
+    "reason": "Correctly refused and suggested @agent mode"
+  },
+  {
+    "id": "F3",
+    "query": "Give me the current EUR/USD exchange rate",
+    "mode": "chat",
+    "response_text": "This requires a live tool call \u2014 use @agent mode to get current data.",
+    "word_count": 14,
+    "grade": "PASS",
+    "reason": "Correctly refused and suggested @agent mode"
+  },
+  {
+    "id": "F4",
+    "query": "Tell me about natural gas \u2014 what's the current market price and recent trends?",
+    "mode": "query",
+    "response_text": "This requires a live tool call \u2014 use @agent mode to get current data.",
+    "word_count": 14,
+    "grade": "PASS",
+    "reason": "Correctly refused price and suggested @agent mode"
+  }
+]

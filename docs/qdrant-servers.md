@@ -36,7 +36,7 @@
 |---|---|
 | Desktop Commander | System commands, process management |
 | Filesystem | File read/write/search |
-| Memory | Shared knowledge graph (entity-relation store, used by both LM Studio and AnythingLLM) |
+| Memory | Local knowledge graph (entity-relation store, used by both LM Studio and AnythingLLM) |
 | Context7 | Library documentation retrieval |
 | Tavily | Web search |
 | Fetch | URL content retrieval |

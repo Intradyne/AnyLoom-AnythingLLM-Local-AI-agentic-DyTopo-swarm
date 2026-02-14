@@ -1,0 +1,104 @@
+{
+  "4": [
+    {
+      "id": "C1",
+      "topn": 4,
+      "query": "What is the trust hierarchy?",
+      "word_count": 73,
+      "grade": "PASS",
+      "response_text": "The trust hierarchy ranks information sources by reliability: tool-verified data (e.g., from Desktop Commander, Filesystem, or Tavily) is highest, followed by workspace RAG context (curated deployment-specific documents), then Memory knowledge graph entities (previously recorded stable facts), and finally training knowledge (general model knowledge, which may be outdated). The agent cites sources explicitly and avoids hallucinated citations by only attributing data to tools when they were actual"
+    },
+    {
+      "id": "C2",
+      "topn": 4,
+      "query": "What is the Memory knowledge graph?",
+      "word_count": 32,
+      "grade": "PASS",
+      "response_text": "Memory is a local persistent entity-relation store shared by both the LM Studio and AnythingLLM agents, used to record stable facts like port mappings, decisions, and preferences across sessions (per workspace context)."
+    },
+    {
+      "id": "C3",
+      "topn": 4,
+      "query": "What embedding model does this stack use and what dimensions?",
+      "word_count": 38,
+      "grade": "PASS",
+      "response_text": "The BGE-M3 model is used for both embedding pipelines. It produces 1024-dimensional dense vectors for AnythingLLM's dense-only search on port 6333 and both dense and sparse vectors for LM Studio's hybrid search on port 6334 (per architecture reference)."
+    },
+    {
+      "id": "C4",
+      "topn": 4,
+      "query": "What are the differences between port 6333 and port 6334?",
+      "word_count": 135,
+      "grade": "PASS",
+      "response_text": "Port 6333 hosts the AnythingLLM Qdrant instance, which uses dense-only search with BGE-M3 embeddings for semantic retrieval. It is automatically integrated into the workspace agent's RAG pipeline, with documents ingested via the AnythingLLM web interface at port 3001, chunked into 6,600-character segments with 1,000-character overlap, and stored in a dedicated volume (qdrant_anythingllm). The retrieval is passive\u2014triggered automatically on relevant queries.\n\nPort 6334 hosts the LM Studio Qdrant "
+    }
+  ],
+  "8": [
+    {
+      "id": "C1",
+      "topn": 8,
+      "query": "What is the trust hierarchy?",
+      "word_count": 73,
+      "grade": "PASS",
+      "response_text": "The trust hierarchy ranks information sources by reliability: tool-verified data (e.g., from Desktop Commander, Filesystem, or Tavily) is highest, followed by workspace RAG context (curated deployment-specific documents), then Memory knowledge graph entities (previously recorded stable facts), and finally training knowledge (general model knowledge, which may be outdated). The agent cites sources explicitly and avoids hallucinated citations by only attributing data to tools when they were actual"
+    },
+    {
+      "id": "C2",
+      "topn": 8,
+      "query": "What is the Memory knowledge graph?",
+      "word_count": 32,
+      "grade": "PASS",
+      "response_text": "Memory is a local persistent entity-relation store shared by both the LM Studio and AnythingLLM agents, used to record stable facts like port mappings, decisions, and preferences across sessions (per workspace context)."
+    },
+    {
+      "id": "C3",
+      "topn": 8,
+      "query": "What embedding model does this stack use and what dimensions?",
+      "word_count": 38,
+      "grade": "PASS",
+      "response_text": "The BGE-M3 model is used for both embedding pipelines. It produces 1024-dimensional dense vectors for AnythingLLM's dense-only search on port 6333 and both dense and sparse vectors for LM Studio's hybrid search on port 6334 (per architecture reference)."
+    },
+    {
+      "id": "C4",
+      "topn": 8,
+      "query": "What are the differences between port 6333 and port 6334?",
+      "word_count": 135,
+      "grade": "PASS",
+      "response_text": "Port 6333 hosts the AnythingLLM Qdrant instance, which uses dense-only search with BGE-M3 embeddings for semantic retrieval. It is automatically integrated into the workspace agent's RAG pipeline, with documents ingested via the AnythingLLM web interface at port 3001, chunked into 6,600-character segments with 1,000-character overlap, and stored in a dedicated volume (qdrant_anythingllm). The retrieval is passive\u2014triggered automatically on relevant queries.\n\nPort 6334 hosts the LM Studio Qdrant "
+    }
+  ],
+  "15": [
+    {
+      "id": "C1",
+      "topn": 15,
+      "query": "What is the trust hierarchy?",
+      "word_count": 73,
+      "grade": "PASS",
+      "response_text": "The trust hierarchy ranks information sources by reliability: tool-verified data (e.g., from Desktop Commander, Filesystem, or Tavily) is highest, followed by workspace RAG context (curated deployment-specific documents), then Memory knowledge graph entities (previously recorded stable facts), and finally training knowledge (general model knowledge, which may be outdated). The agent cites sources explicitly and avoids hallucinated citations by only attributing data to tools when they were actual"
+    },
+    {
+      "id": "C2",
+      "topn": 15,
+      "query": "What is the Memory knowledge graph?",
+      "word_count": 32,
+      "grade": "PASS",
+      "response_text": "Memory is a local persistent entity-relation store shared by both the LM Studio and AnythingLLM agents, used to record stable facts like port mappings, decisions, and preferences across sessions (per workspace context)."
+    },
+    {
+      "id": "C3",
+      "topn": 15,
+      "query": "What embedding model does this stack use and what dimensions?",
+      "word_count": 38,
+      "grade": "PASS",
+      "response_text": "The BGE-M3 model is used for both embedding pipelines. It produces 1024-dimensional dense vectors for AnythingLLM's dense-only search on port 6333 and both dense and sparse vectors for LM Studio's hybrid search on port 6334 (per architecture reference)."
+    },
+    {
+      "id": "C4",
+      "topn": 15,
+      "query": "What are the differences between port 6333 and port 6334?",
+      "word_count": 135,
+      "grade": "PASS",
+      "response_text": "Port 6333 hosts the AnythingLLM Qdrant instance, which uses dense-only search with BGE-M3 embeddings for semantic retrieval. It is automatically integrated into the workspace agent's RAG pipeline, with documents ingested via the AnythingLLM web interface at port 3001, chunked into 6,600-character segments with 1,000-character overlap, and stored in a dedicated volume (qdrant_anythingllm). The retrieval is passive\u2014triggered automatically on relevant queries.\n\nPort 6334 hosts the LM Studio Qdrant "
+    }
+  ]
+}

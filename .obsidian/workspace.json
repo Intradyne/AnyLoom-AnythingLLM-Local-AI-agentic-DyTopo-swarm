@@ -1,0 +1,227 @@
+{
+  "main": {
+    "id": "c3dac885287eecf2",
+    "type": "split",
+    "children": [
+      {
+        "id": "cf16181c43d9e77a",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "1c850e238634fa58",
+            "type": "leaf",
+            "state": {
+              "type": "canvas",
+              "state": {
+                "file": "Overview-Obsidaian.canvas",
+                "viewState": {
+                  "x": -846.7053962821562,
+                  "y": -1429.4738051668155,
+                  "zoom": -0.6666666666666667
+                }
+              },
+              "icon": "lucide-layout-dashboard",
+              "title": "Overview-Obsidaian"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "2762cbb89349458d",
+    "type": "split",
+    "children": [
+      {
+        "id": "49d7887274a68dc3",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "7fa0a89bcd129428",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "7cf92b4dd5b58bc4",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "36d06b85d463461b",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "65cec5266f54858b",
+    "type": "split",
+    "children": [
+      {
+        "id": "67ce3ce4fd000cc0",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "fcaf405cf7143ee5",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks"
+            }
+          },
+          {
+            "id": "4b314988765bbef6",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links"
+            }
+          },
+          {
+            "id": "01cc35d85719c4b2",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "d2335b27d6c4f216",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "All properties"
+            }
+          },
+          {
+            "id": "09c45e69ad1b5e29",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false
+    }
+  },
+  "active": "1c850e238634fa58",
+  "lastOpenFiles": [
+    "README.md.tmp.2448.1771106522470",
+    "src/bench_phase6_showcase.py",
+    "src/bench_phase5_lmstudio.py",
+    "src/bench_phase4_stability.py",
+    "src/bench_phase3_workspace.py",
+    "src/bench_phase2_adversarial.py",
+    "src/bench_phase1_explanation.py",
+    "docs/benchmark-results-showcase.md",
+    "docs/benchmarker_phase6_showcase.json",
+    "docs/benchmarker_phase5_lmstudio.json",
+    "docs/benchmarker_phase4_stability.json",
+    "docs/benchmarker_phase3_workspace.json",
+    "prompts/benchmarker.md",
+    "docs/benchmark-v2-results.md",
+    "prompts/benchmark-v2.md",
+    "docs/benchmark-results.md",
+    "README.md",
+    "Overview-Obsidaian.canvas",
+    "rag-docs/lm-studio/09-workflow-patterns-reference.md",
+    "rag-docs/lm-studio/10-operational-troubleshooting-reference.md",
+    "rag-docs/lm-studio/08-dual-rag-comparison-reference.md",
+    "rag-docs/lm-studio/07-lm-studio-system-prompt-reference.md",
+    "rag-docs/lm-studio/06-memory-context7-reference.md",
+    "rag-docs/lm-studio/04-dytopo-swarm-reference.md",
+    "rag-docs/lm-studio/03-mcp-tool-stack-reference.md",
+    "rag-docs/lm-studio/05-model-embedding-reference.md",
+    "rag-docs/lm-studio/02-qdrant-rag-reference.md",
+    "rag-docs/lm-studio/01-architecture-reference.md",
+    "rag-docs/anythingllm/workflow-recipes.md",
+    "rag-docs/anythingllm/output-and-trust-standards.md",
+    "rag-docs/anythingllm/infrastructure-and-routing.md",
+    "rag-docs/anythingllm/tool-reference.md",
+    "rag-docs/anythingllm/error-recovery-guide.md",
+    "rag-docs/anythingllm/anythingllm-system-prompt-reference.md",
+    "prompts/lm-studio-system-prompt.md",
+    "prompts/anythingllm-system-prompt.md",
+    "docs/qdrant-topology.md",
+    "New folder/Overview-Obsidaian.canvas"
+  ]
+}

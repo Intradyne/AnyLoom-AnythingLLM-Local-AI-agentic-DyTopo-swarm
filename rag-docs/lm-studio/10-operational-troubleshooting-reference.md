@@ -84,15 +84,9 @@ Resolution: Trust the tool-returned date. Present it as a current fact. Do not a
 
 Symptom: The response says "per Tavily" or "based on live data" but the value matches training-knowledge-era data rather than current market reality. The price or fact looks stale despite the tool citation.
 
-<<<<<<< HEAD
 Cause: The agent generated an answer from training knowledge and attributed it to a tool without actually calling the tool, or called the tool but used the training-knowledge value in the response instead of the tool result. This is a hallucinated citation — it falsely claims tool-verified authority for unverified data. The worst case is fabricating both a price and a source name (e.g., inventing a financial data provider) without calling any tool — this combines hallucinated data with a hallucinated source attribution.
 
 Resolution: For time-sensitive queries, call the tool BEFORE generating any answer text. Build the response entirely from the tool result. Every value, source name, and URL in the response must come from the tool result, not from training knowledge or from prior prompt examples. Only cite a tool when the cited data came from that tool's response in the current turn. The correct flow is: recognize time-sensitive query → call tool → read result → build answer from result with source link.
-=======
-Cause: The agent generated an answer from training knowledge and attributed it to a tool without actually calling the tool, or called the tool but used the training-knowledge value in the response instead of the tool result. This is a hallucinated citation — it falsely claims tool-verified authority for unverified data.
-
-Resolution: For time-sensitive queries, call the tool BEFORE generating any answer text. Build the response entirely from the tool result. Only cite a tool when the cited data came from that tool's response in the current turn. The correct flow is: recognize time-sensitive query → call tool → read result → build answer from result with source link.
->>>>>>> 9942e327ce1dc149abe142416c07aadc36c3deec
 
 <!-- Related: hallucinated citation, stale data, tool citation, Tavily, training knowledge, anchoring, tool-call-first, citation integrity -->
 

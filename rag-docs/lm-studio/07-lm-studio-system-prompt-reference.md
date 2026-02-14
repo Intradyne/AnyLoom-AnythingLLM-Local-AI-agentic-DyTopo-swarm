@@ -4,7 +4,7 @@
 
 <!-- Verified: 2026-02-13 -->
 
-The LM Studio agent is a tool-using AI with embedded document search, web search, URL fetching, browser automation, file and shell access, live library documentation, multi-agent swarms, a reasoning scratchpad, and a shared persistent memory graph. It runs Qwen3-30B-A3B-Instruct-2507 (Q6_K quantization) on localhost port 1234 with an 80,000-token context window on an RTX 5090 with 32 GB VRAM.
+The LM Studio agent is a tool-using AI with embedded document search, web search, URL fetching, browser automation, file and shell access, live library documentation, multi-agent swarms, a reasoning scratchpad, and a local persistent memory graph. It runs Qwen3-30B-A3B-Instruct-2507 (Q6_K quantization) on localhost port 1234 with an 80,000-token context window on an RTX 5090 with 32 GB VRAM.
 
 The agent's MCP toolkit spans tools across two servers. The Docker MCP Gateway provides 9 containerized tool servers: Desktop Commander, Filesystem, Memory, Context7, Tavily, Fetch, Playwright, Sequential Thinking, and n8n. The native Python qdrant-rag server provides 5 RAG tools (`rag_search`, `rag_status`, `rag_reindex`, `rag_sources`, `rag_file_info`) plus 3 DyTopo swarm tools (`swarm_start`, `swarm_status`, `swarm_result`).
 
@@ -38,13 +38,13 @@ Six positively-framed behavioral rules govern the agent. Every rule is a positiv
 
 Qwen3 supports hybrid thinking through the `/think` and `/no_think` toggle, which controls whether the model engages internal chain-of-thought reasoning — a deliberate step-by-step process that improves accuracy on complex tasks at the cost of additional tokens and latency.
 
-### /think (extended reasoning)
-Multi-step debugging and root-cause analysis. Architecture analysis and design decisions. Code review and refactoring plans. Planning sequences of 3 or more tool calls. Synthesizing conflicting information from multiple sources. Comparing trade-offs between approaches. Complex error diagnosis spanning multiple components. Constructing multi-file changes or migration plans.
+### /think (extended reasoning — the default)
+Multi-step debugging and root-cause analysis. Architecture analysis and design decisions. Code review and refactoring plans. Planning sequences of 3 or more tool calls. Synthesizing conflicting information from multiple sources. Comparing trade-offs between approaches. Complex error diagnosis spanning multiple components. Constructing multi-file changes or migration plans. This model is fast — use extended reasoning freely.
 
 ### /no_think (fast response)
 Status checks and health polls. Single tool calls with straightforward intent. Direct factual lookups via `rag_search` or Memory. Formatting responses, code blocks, tables. `swarm_status` polls and `rag_status` checks. Simple file reads and directory listings. Greetings, confirmations, acknowledgments. Following up on an already-planned tool chain.
 
-The default is `/no_think` for fast, token-efficient responses. The agent escalates to `/think` when the task matches the extended reasoning list above.
+The default is `/think` for thorough, high-quality responses. This model is fast — use extended reasoning freely. The agent drops to `/no_think` only when the task matches the fast response list above.
 
 <!-- Related: reasoning mode, /think, /no_think, hybrid thinking, Qwen3, chain-of-thought, extended reasoning, fast response, mode selection -->
 
@@ -56,13 +56,9 @@ The total context window is 80,000 tokens. The system prompt consumes approximat
 
 The agent keeps `rag_search` limit to 3-5 results for targeted queries and 8-10 for broad surveys, preferring targeted queries to conserve context. When approaching the context ceiling, the agent distills prior findings into a compact summary and continues. LM Studio's RollingWindow context manager drops the oldest messages when the window fills, making the agent's summarized response text the most durable record of discoveries — raw tool output in dropped messages is permanently lost. Each tool result is condensed into 1-2 sentences before the next call to ensure key findings survive context rotation.
 
-<<<<<<< HEAD
 Note: LM Studio and AnythingLLM have INDEPENDENT Qdrant instances with separate RAG context budgets. AnythingLLM's auto-injection (port 6333) uses ~8K tokens of RAG snippets from its own budget. LM Studio's explicit `rag_search` results (port 6334) come from its own separate ~71K remaining budget. Each pipeline gets its own RAG context budget — the combined system can effectively use ~16K of RAG context across both agents.
 
 <!-- Related: context budget, 80K tokens, 8900 overhead, 71000 remaining, token management, RollingWindow, Jinja template, tool definitions, context ceiling, independent Qdrant instances, dual RAG budget -->
-=======
-<!-- Related: context budget, 80K tokens, 8900 overhead, 71000 remaining, token management, RollingWindow, Jinja template, tool definitions, context ceiling -->
->>>>>>> 9942e327ce1dc149abe142416c07aadc36c3deec
 
 ## What is the system architecture and which ports belong to which service?
 
@@ -72,7 +68,7 @@ The system prompt includes a compact ASCII diagram showing the stack topology. L
 
 Port 6334 hosts the LM Studio agent's Qdrant instance using hybrid search that combines dense semantic vectors (1024-dimensional from BGE-M3 FlagEmbedding on CPU) with sparse lexical vectors through RRF fusion. Port 6333 hosts AnythingLLM's separate Qdrant instance using dense-only cosine similarity search. These are two independent Docker containers with separate data — different embedding models, different chunking strategies, separate collections. The prompt explicitly states they are "completely independent" to prevent the agent from confusing port assignments or attempting cross-container operations.
 
-The Memory knowledge graph is shared between both frontends through the Docker MCP Gateway. Both agents read and write the same graph, requiring consistent naming conventions (PascalCase entities, snake_case types and relations).
+The Memory knowledge graph is accessed by both agents on this machine through the Docker MCP Gateway. Both agents read and write the same graph, requiring consistent naming conventions (PascalCase entities, snake_case types and relations).
 
 <!-- Related: architecture, port 1234, port 6333, port 6334, Qdrant, hybrid search, RRF, dense-only, MCP servers, Memory graph, ASCII diagram -->
 
@@ -82,7 +78,7 @@ The Memory knowledge graph is shared between both frontends through the Docker M
 
 The system prompt provides a first-match-wins priority ladder that determines tool selection based on query type. The agent works down the list and uses the first matching tool.
 
-`rag_search` (priority 1) handles questions about project documentation, architecture, configuration, procedures, and conventions. Memory via `search_nodes` (priority 2) handles stable facts, decisions, error resolutions, port mappings, and user preferences. Context7 (priority 3) handles external library and API documentation using the two-step `resolve-library-id` then `get-library-docs` sequence. Tavily (priority 4) handles live data (prices, scores, news, current events) and general web search — returns structured answers and is preferred over Fetch for search-style queries. Fetch (priority 5) retrieves content from a known URL with clean HTML. Desktop Commander (priority 6) runs shell commands and checks system state. Filesystem (priority 7) handles file read/write/search operations. Playwright (priority 8) automates browser interaction for JS-heavy pages. Sequential Thinking (priority 9) provides a structured reasoning scratchpad. DyTopo swarm (priority 10) launches multi-agent collaboration. The prompt also includes a "Tool selection for external information" subsection categorizing query types (real-time data → Tavily, known URL → Fetch, library docs → Context7, unknown topic → Tavily) and a "Fetch truncation handling" subsection with a 3-truncation circuit breaker.
+`rag_search` (priority 1) handles questions about project documentation, architecture, configuration, procedures, and conventions. Memory via `search_nodes` (priority 2) handles stable facts, decisions, error resolutions, port mappings, and user preferences. Context7 (priority 3) handles external library and API documentation using the two-step `resolve-library-id` then `get-library-docs` sequence. Tavily (priority 4) handles live data (prices, scores, news, current events) and general web search — returns structured answers and is preferred over Fetch for search-style queries. Fetch (priority 5) retrieves content from a known URL with clean HTML. Desktop Commander (priority 6) runs shell commands and checks system state. Filesystem (priority 7) handles file read/write/search operations (MCP Filesystem tool — reads, writes, searches, and lists files. NOT Windows Explorer or File Explorer.). Playwright (priority 8) automates browser interaction for JS-heavy pages. Sequential Thinking (priority 9) provides a structured reasoning scratchpad. DyTopo swarm (priority 10) launches multi-agent collaboration. The prompt also includes a "Tool selection for external information" subsection categorizing query types (real-time data → Tavily, known URL → Fetch, library docs → Context7, unknown topic → Tavily) and a "Fetch truncation handling" subsection with a 3-truncation circuit breaker.
 
 <!-- Related: tool priority, first-match-wins, priority ladder, rag_search, Memory, Context7, Fetch, Tavily, Desktop Commander, Filesystem, Playwright, DyTopo -->
 
@@ -125,21 +121,21 @@ Web content: Tavily → Fetch → Playwright. Local knowledge: Memory → rag_se
 
 <!-- Related: loop discipline, two-strike rule, progress gate, tool call budget, error recovery, fallback chains, self-regulation, classify-then-act, LM Studio limitations -->
 
-## How does the shared Memory knowledge graph protocol work?
+## How does the local Memory knowledge graph protocol work?
 
 <!-- Verified: 2026-02-13 -->
 
-The Memory section of the system prompt is byte-for-byte identical between the LM Studio and AnythingLLM system prompts, ensuring both agents follow the same graph protocol. The shared text specifies that both agents read and write the graph and must maintain consistency.
+The Memory section of the system prompt is byte-for-byte identical between the LM Studio and AnythingLLM system prompts, ensuring both agents follow the same graph protocol. Both agents on this machine read and write the graph and must maintain consistency.
 
-**What to write:** stable facts, port mappings, collection names, user preferences, project decisions, architecture choices, resolved errors, useful URLs.
+**What to write:** stable facts, port mappings, collection names, user preferences, project decisions, architecture choices, resolved errors, useful URLs. Memory is local and private — use it freely to build up institutional knowledge that makes every future session more productive.
 
-**What to skip:** transient context, speculation, secrets, entire file contents (store file paths instead).
+**What to skip:** transient context, speculation, entire file contents (store file paths instead — files can be read fresh when needed and paths are more efficient than duplicating content).
 
 **Search-before-create discipline:** before creating entities, always call `search_nodes` first. If the entity exists, use `add_observations` to append new facts rather than creating duplicates. This prevents entity fragmentation that degrades retrieval quality for both agents.
 
-**Naming conventions:** PascalCase entity names (QdrantMCP, BGEm3Config). snake_case entity types (service_config, architecture_decision). snake_case relation names (serves, depends_on, replaced_by). This convention is enforced identically by both agents to keep the shared graph searchable and consistent.
+**Naming conventions:** PascalCase entity names (QdrantMCP, BGEm3Config). snake_case entity types (service_config, architecture_decision). snake_case relation names (serves, depends_on, replaced_by). This convention is enforced identically by both agents to keep the local graph searchable and consistent.
 
-<!-- Related: Memory protocol, shared knowledge graph, search-before-create, PascalCase, snake_case, naming conventions, entity management, graph consistency -->
+<!-- Related: Memory protocol, local knowledge graph, search-before-create, PascalCase, snake_case, naming conventions, entity management, graph consistency -->
 
 ## How does the agent verify facts, start sessions, and manage output?
 
@@ -163,26 +159,20 @@ The agent leads with the answer, followed by evidence with tool and source attri
 
 <!-- Verified: 2026-02-14 -->
 
-Rev4 introduced three hard behavioral fixes. **Trust hierarchy covers dates** — tool-returned dates are current reality; present without disclaimers. **Response proportionality is a hard constraint** — volunteering unrequested depth is a quality failure. **Follow-up offers are prohibited** — end with the answer. **Citation format:** `[text](url)` markdown links only.
+Rev4 introduced three hard behavioral fixes. **Trust hierarchy covers dates** — tool-returned dates are current reality; present without disclaimers. **Response proportionality** — match depth to complexity, but when in doubt, include more context rather than less. **Follow-up offers are prohibited** — end with the answer. **Citation format:** `[text](url)` markdown links only.
 
-<<<<<<< HEAD
 Rev5 added tool-call discipline to prevent two production failures. **Tool-call-first for time-sensitive queries** — call Tavily BEFORE generating any answer text. Generating from training knowledge first creates an anchoring problem where the stale value persists even after the tool returns different data. The correct flow: call tool → read result → build answer from result. **Citation integrity** — only cite a tool when it was actually called in the current turn and the cited data came from that response. Attributing training-knowledge data to Tavily is a hallucinated citation that falsely claims tool-verified authority. The worst failure mode is fabricating a specific source name (e.g., inventing a financial data provider) and presenting training-era data as if a tool returned it — this combines a hallucinated price, a hallucinated source, and a hallucinated citation in a single response. Every value, source name, and URL in the answer must come from the tool result, not from training knowledge or prior prompt examples.
-=======
-Rev5 added tool-call discipline to prevent two production failures. **Tool-call-first for time-sensitive queries** — call Tavily BEFORE generating any answer text. Generating from training knowledge first creates an anchoring problem where the stale value persists even after the tool returns different data. The correct flow: call tool → read result → build answer from result. **Citation integrity** — only cite a tool when it was actually called in the current turn and the cited data came from that response. Attributing training-knowledge data to Tavily is a hallucinated citation that falsely claims tool-verified authority.
->>>>>>> 9942e327ce1dc149abe142416c07aadc36c3deec
 
-<!-- Related: rev4, rev5, hard constraint, quality failure, trust dates, no follow-up offers, proportionality, citation format, tool-call-first, anchoring, hallucinated citation, citation integrity -->
+Rev6 added depth calibration and broadened price fabrication guards based on benchmark testing. **Broadened HARD STOP** — the instruction to never output any numeric price, rate, or financial figure now explicitly covers all framing: "ballpark", "approximately", "roughly", "based on your training data", "last you knew", "even if it's not current", and "what was it worth when..." — the answer to all of these is the same: call the tool first or refuse if tools are unavailable. The prompt includes a negative example showing BAD (generating a plausible dollar amount from training data then calling Tavily to "verify") vs GOOD (call Tavily first, build the entire response from the Tavily result). **Explanation tier word limit** — explanation-tier queries (how-tos, comparisons, "how does X work") now have an explicit 50-150 word maximum with strict formatting bans: NO ### headers, NO bullet lists, NO numbered lists, NO bold formatting within body text — flowing prose only. **Lookup tier reinforcement** — "what is X?" and "what is [component]?" are explicitly classified as lookups requiring 1-3 sentences maximum with no headers, no bullets, no feature breakdowns. The prompt includes concrete lookup examples (port 6333 lookup, DyTopo definition) each followed by "That is the complete answer" reinforcement. **Explanation example reinforcement** — a concrete explanation example (80 words, two paragraphs, no formatting) is followed by: "If you catch yourself writing a bullet point or header for an explanation query, STOP and rewrite as prose."
+
+<!-- Related: rev4, rev5, rev6, hard constraint, quality failure, trust dates, no follow-up offers, proportionality, citation format, tool-call-first, anchoring, hallucinated citation, citation integrity, HARD STOP, ballpark, approximately, roughly, price fabrication guard, broadened framing, lookup tier, explanation tier, 50-150 words, depth calibration, That is the complete answer, what is X, no headers, no bullet lists, flowing prose -->
 
 ## What do typical agent workflows look like?
 
 <!-- Verified: 2026-02-13 -->
 
-The system prompt includes workflow examples in compact arrow notation, each demonstrating Act-Observe-Adapt with source citation. The patterns include: **config lookup** (single `rag_search` with citation), **live data request** (`Tavily("current silver price")` → one-call answer with source — added in rev2 to demonstrate Tavily-first for real-time data), **multi-tool chain** (`rag_status` → `rag_reindex`), **DyTopo swarm** (launch → poll → retrieve → present by agent role), **error recovery** (Context7 empty → Tavily fallback), **query reformulation** (broad → narrow with source filter), **Memory integration** (search-before-create), and **file editing** (read → modify → verify).
+The system prompt includes workflow examples in compact arrow notation, each demonstrating Act-Observe-Adapt with source citation. The patterns include: **config lookup** (single `rag_search` with citation), **live data request** (`Tavily("[asset] price")` → one-call answer with source — added in rev2 to demonstrate Tavily-first for real-time data), **multi-tool chain** (`rag_status` → `rag_reindex`), **DyTopo swarm** (launch → poll → retrieve → present by agent role), **error recovery** (Context7 empty → Tavily fallback), **query reformulation** (broad → narrow with source filter), **Memory integration** (search-before-create), and **file editing** (read → modify → verify).
 
-<<<<<<< HEAD
-Each example progresses from trigger condition through tool calls to synthesized answer with source citation. The live data example demonstrates Tavily-first with concise linked output — the response format is `"[Asset] is at [tool-returned price] ([Source](tool-returned-url))."` — a 1-sentence answer matching the question's complexity, built entirely from the tool result. Every bracketed placeholder must be filled exclusively from the Tavily response — the price, the source name, and the URL all come from the tool, never from training knowledge or from examples in this prompt. Rev3 additions include inline markdown link citation for all URL-returning tools and output proportionality guidance scaling response depth to question complexity. Rev4 additions: trust hierarchy covers dates, proportionality upgraded to hard constraint, follow-up offers prohibited, citation format standardized to `[text](url)`. Rev5 additions: tool-call-first discipline for time-sensitive queries (call Tavily before generating answer text to prevent anchoring), citation integrity (only cite tools actually called in the current turn — attributing training data to Tavily is a hallucinated citation). The prompt closes with its bookend: "Use your tools. Present results, not plans. Cite your sources."
-=======
-Each example progresses from trigger condition through tool calls to synthesized answer with source citation. The live data example demonstrates Tavily-first with concise linked output — `"Silver is trading at $32.45/oz ([Kitco](url))."` — a 1-sentence answer matching the question's complexity. Rev3 additions include inline markdown link citation for all URL-returning tools and output proportionality guidance scaling response depth to question complexity. Rev4 additions: trust hierarchy covers dates, proportionality upgraded to hard constraint, follow-up offers prohibited, citation format standardized to `[text](url)`. Rev5 additions: tool-call-first discipline for time-sensitive queries (call Tavily before generating answer text to prevent anchoring), citation integrity (only cite tools actually called in the current turn — attributing training data to Tavily is a hallucinated citation). The prompt closes with its bookend: "Use your tools. Present results, not plans. Cite your sources."
->>>>>>> 9942e327ce1dc149abe142416c07aadc36c3deec
+Each example progresses from trigger condition through tool calls to synthesized answer with source citation. The live data example demonstrates Tavily-first with concise linked output — the response format is `"[Asset] is at [tool-returned price] ([Source](tool-returned-url))."` — a 1-sentence answer matching the question's complexity, built entirely from the tool result. Every bracketed placeholder must be filled exclusively from the Tavily response — the price, the source name, and the URL all come from the tool, never from training knowledge or from examples in this prompt. Rev3 additions include inline markdown link citation for all URL-returning tools and output proportionality guidance scaling response depth to question complexity. Rev4 additions: trust hierarchy covers dates, proportionality updated, follow-up offers prohibited, citation format standardized to `[text](url)`. Rev5 additions: tool-call-first discipline for time-sensitive queries (call Tavily before generating answer text to prevent anchoring), citation integrity (only cite tools actually called in the current turn — attributing training data to Tavily is a hallucinated citation). Rev6 additions: the depth calibration section now includes concrete lookup and explanation response examples with word counts and explicit stop-signals — each example ends with "That is the complete answer" reinforcement matching the depth tier definitions. The prompt closes with its bookend: "Use your tools. Present results, not plans. Cite your sources."
 
-<!-- Related: workflow examples, config lookup, multi-tool chain, DyTopo swarm, error recovery, query reformulation, Memory integration, web research, file editing, Act-Observe-Adapt, source citation, bookend, rev4, rev5, tool-call-first, anchoring, hallucinated citation -->
+<!-- Related: workflow examples, config lookup, multi-tool chain, DyTopo swarm, error recovery, query reformulation, Memory integration, web research, file editing, Act-Observe-Adapt, source citation, bookend, rev4, rev5, rev6, tool-call-first, anchoring, hallucinated citation, depth calibration, lookup examples, explanation examples -->

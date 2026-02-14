@@ -1,0 +1,54 @@
+{
+  "runs": {
+    "D3": [
+      {
+        "run": 1,
+        "word_count": 262,
+        "text": "The decision cascade is a tiered query routing system that determines the order in which information sources are consulted, progressing from the cheapest and fastest to the most expensive and specialized. It ensures efficient, accurate responses by prioritizing reliable, low-cost sources first:\n\n1. **Tier 0 (Automatic RAG Context)**: The workspace's Qdrant instance on port 6333 automatically injects relevant document chunks into the system message on every relevant query, requiring zero tool cal"
+      },
+      {
+        "run": 2,
+        "word_count": 262,
+        "text": "The decision cascade is a tiered query routing system that determines the order in which information sources are consulted, progressing from the cheapest and fastest to the most expensive and specialized. It ensures efficient, accurate responses by prioritizing reliable, low-cost sources first:\n\n1. **Tier 0 (Automatic RAG Context)**: The workspace's Qdrant instance on port 6333 automatically injects relevant document chunks into the system message on every relevant query, requiring zero tool cal"
+      },
+      {
+        "run": 3,
+        "word_count": 262,
+        "text": "The decision cascade is a tiered query routing system that determines the order in which information sources are consulted, progressing from the cheapest and fastest to the most expensive and specialized. It ensures efficient, accurate responses by prioritizing reliable, low-cost sources first:\n\n1. **Tier 0 (Automatic RAG Context)**: The workspace's Qdrant instance on port 6333 automatically injects relevant document chunks into the system message on every relevant query, requiring zero tool cal"
+      }
+    ],
+    "D4": [
+      {
+        "run": 1,
+        "word_count": 156,
+        "text": "RRF stands for **Reciprocal Rank Fusion**, a technique used to combine multiple ranked result lists into a single unified ranking. In this stack, it is used in the hybrid search pipeline on port 6334 to merge results from two independent search pathways: dense semantic search (using BGE-M3 embeddings) and sparse lexical matching (using keyword-based term frequency weights). The fusion works by computing a score for each document based on its rank across all lists, using the formula:\n\n$$\n\\text{Sc"
+      },
+      {
+        "run": 2,
+        "word_count": 156,
+        "text": "RRF stands for **Reciprocal Rank Fusion**, a technique used to combine multiple ranked result lists into a single unified ranking. In this stack, it is used in the hybrid search pipeline on port 6334 to merge results from two independent search pathways: dense semantic search (using BGE-M3 embeddings) and sparse lexical matching (using keyword-based term frequency weights). The fusion works by computing a score for each document based on its rank across all lists, using the formula:\n\n$$\n\\text{Sc"
+      },
+      {
+        "run": 3,
+        "word_count": 156,
+        "text": "RRF stands for **Reciprocal Rank Fusion**, a technique used to combine multiple ranked result lists into a single unified ranking. In this stack, it is used in the hybrid search pipeline on port 6334 to merge results from two independent search pathways: dense semantic search (using BGE-M3 embeddings) and sparse lexical matching (using keyword-based term frequency weights). The fusion works by computing a score for each document based on its rank across all lists, using the formula:\n\n$$\n\\text{Sc"
+      }
+    ]
+  },
+  "analysis": {
+    "D3": {
+      "min": 262,
+      "max": 262,
+      "avg": 262.0,
+      "spread": 0,
+      "verdict": "Deterministic"
+    },
+    "D4": {
+      "min": 156,
+      "max": 156,
+      "avg": 156.0,
+      "spread": 0,
+      "verdict": "Deterministic"
+    }
+  }
+}

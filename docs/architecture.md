@@ -25,7 +25,7 @@
 │  Docker Gateway:         │      │  LLM → LM Studio :1234   │
 │   • Desktop Commander    │      │  Embed → LM Studio :1234  │
 │   • Filesystem           │      │  VectorDB → Qdrant :6333  │
-│   • Memory (shared)      │      │                          │
+│   • Memory (local)       │      │                          │
 │   • Context7             │      │  Workspace RAG:          │
 │   • Tavily               │      │   6600-char chunks       │
 │   • Fetch                │      │   1000-char overlap      │
@@ -89,6 +89,6 @@ LM Studio serves as the GPU inference backbone, hosting both the Qwen3-30B-A3B c
 
 AnythingLLM provides a workspace-based RAG interface with its own document ingestion pipeline. It connects to LM Studio for both LLM inference and embedding generation, and stores its vectors in a dedicated Qdrant instance on port 6333. Its chunking strategy uses 6600-character chunks with 1000-character overlap, retrieving 16 snippets at low similarity threshold with 30-message conversation history.
 
-The MCP server ecosystem splits across two transports. Nine containerized servers run through the Docker MCP Gateway, providing system commands, file operations, a shared knowledge graph, library docs, web search, URL fetching, browser automation, multi-step reasoning, and workflow automation. The native Python `qdrant-rag` server runs directly on the host, implementing hybrid dense+sparse RAG search with RRF fusion using BGE-M3 on CPU (~2.3 GB RAM), and DyTopo multi-agent swarm orchestration using MiniLM-L6-v2 for descriptor routing (~80 MB RAM).
+The MCP server ecosystem splits across two transports. Nine containerized servers run through the Docker MCP Gateway, providing system commands, file operations, a local knowledge graph, library docs, web search, URL fetching, browser automation, multi-step reasoning, and workflow automation. The native Python `qdrant-rag` server runs directly on the host, implementing hybrid dense+sparse RAG search with RRF fusion using BGE-M3 on CPU (~2.3 GB RAM), and DyTopo multi-agent swarm orchestration using MiniLM-L6-v2 for descriptor routing (~80 MB RAM).
 
 Two independent Qdrant Docker containers serve the two RAG pipelines. The AnythingLLM instance on port 6333 stores dense-only vectors from AnythingLLM's embedding pipeline. The MCP server instance on port 6334 stores hybrid dense+sparse vectors with RRF fusion, payload-indexed by source file and source directory for filtered retrieval across multiple document sources.

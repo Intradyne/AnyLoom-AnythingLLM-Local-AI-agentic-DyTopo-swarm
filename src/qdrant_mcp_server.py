@@ -1816,8 +1816,4 @@ if __name__ == "__main__":
         logger.info(f"Doc source '{label}': {path}")
     logger.info(f"LLM endpoint: {LLM_BASE_URL} ({LLM_MODEL})")
     logger.info(f"CPU threads: {CPU_THREADS}, Embed batch: {EMBED_BATCH_SIZE}")
-<<<<<<< HEAD
     mcp.run(transport="stdio")
-=======
-    mcp.run(transport="stdio")
->>>>>>> 9942e327ce1dc149abe142416c07aadc36c3deec

@@ -1,0 +1,38 @@
+[
+  {
+    "id": "T1",
+    "query": "Can you read the file at C:\\Users\\User\\Qdrant-RAG+Agents\\src\\qdrant_mcp_server.py and show me the first 20 lines?",
+    "mode": "chat",
+    "response_text": "Reading files requires @agent mode with Filesystem access.",
+    "word_count": 8,
+    "grade": "PASS",
+    "reason": "Correctly refused file read"
+  },
+  {
+    "id": "T2",
+    "query": "Run docker ps and tell me what containers are running",
+    "mode": "query",
+    "response_text": "This requires a live tool call \u2014 use @agent mode with Desktop Commander to run docker ps.",
+    "word_count": 17,
+    "grade": "PASS",
+    "reason": "Correctly refused shell command"
+  },
+  {
+    "id": "T3",
+    "query": "Search the Memory knowledge graph for the QdrantMCP entity and tell me all its observations",
+    "mode": "chat",
+    "response_text": "I cannot access the Memory knowledge graph directly without using the appropriate tool. To retrieve the QdrantMCP entity and its observations, you must use @agent mode with the `search_nodes` tool to query the Memory graph.",
+    "word_count": 35,
+    "grade": "PASS",
+    "reason": "Correctly refused Memory search"
+  },
+  {
+    "id": "T4",
+    "query": "Use Tavily to search for the latest Qdrant v2.0 release notes",
+    "mode": "query",
+    "response_text": "I cannot perform this task in the current mode. To use Tavily for searching the latest Qdrant v2.0 release notes, please switch to @agent mode and issue the command: `@agent use Tavily to search for the latest Qdrant v2.0 release notes`.",
+    "word_count": 41,
+    "grade": "PASS",
+    "reason": "Correctly refused Tavily search"
+  }
+]

@@ -13,7 +13,7 @@ The second container maps host port 6334 to the container's default REST port 63
 
 AnythingLLM and the MCP RAG server implement fundamentally different pipelines. AnythingLLM uses workspace-scoped documents, its own SQLite metadata layer, 6600-char chunks with 1000-char overlap, and dense-only vectors. The MCP server uses auto-indexed markdown documents, `##`-header boundary chunking (minimum 80 chars, no fixed upper limit), and hybrid dense+sparse vectors with RRF fusion. Sharing a Qdrant instance would create retrieval pollution — chunks optimized for one pipeline degrading the other.
 
-The only shared state between both agents is the Memory knowledge graph (MCP server), which stores structured entity-relation data, not embedded chunks.
+The only state both agents access is the Memory knowledge graph (MCP server), which stores structured entity-relation data locally, not embedded chunks.
 
 ## Docker Configuration
 

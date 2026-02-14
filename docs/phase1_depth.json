@@ -1,0 +1,38 @@
+[
+  {
+    "id": "D1",
+    "query": "What is the trust hierarchy?",
+    "mode": "query",
+    "response_text": "The trust hierarchy ranks information sources by reliability: tool-verified data (e.g., from Desktop Commander, Filesystem, or Tavily) is highest, followed by workspace RAG context (curated deployment-specific documents), then Memory knowledge graph entities (previously recorded stable facts), and finally training knowledge (general model knowledge, which may be outdated). The agent cites sources explicitly and avoids hallucinated citations by only attributing data to tools when they were actually called in the current turn (per output-and-trust-standards.md).",
+    "word_count": 73,
+    "grade": "PASS",
+    "reason": "Concise and accurate (73 words)"
+  },
+  {
+    "id": "D2",
+    "query": "What is DyTopo?",
+    "mode": "query",
+    "response_text": "DyTopo is a Dynamic Topology orchestration system that launches teams of specialized AI agents (code, math, or general domains) which collaborate through semantically-routed message passing across multiple inference rounds. It uses the MiniLM-L6-v2 model for embedding agent descriptors and constructs a directed acyclic graph for efficient, relevant communication. DyTopo is available exclusively through the LM Studio interface via the qdrant-rag MCP server and cannot be accessed from AnythingLLM (per architecture reference and tool-reference.md).",
+    "word_count": 73,
+    "grade": "PASS",
+    "reason": "Concise and accurate (73 words)"
+  },
+  {
+    "id": "D3",
+    "query": "What is the decision cascade?",
+    "mode": "query",
+    "response_text": "The decision cascade is a tiered query routing system that prioritizes the cheapest and fastest information source first. It progresses from Tier 0 (automatic RAG context from port 6333) to Tier 1 (Memory knowledge graph), Tier 2 (Context7 for library docs), Tier 3 (Tavily, Fetch, Playwright for web content), Tier 4 (Desktop Commander, Filesystem, Sequential Thinking for system operations), and Tier 5 (DyTopo swarms for multi-agent collaboration). The agent uses the highest tier that can answer the question and only descends if higher tiers fail (per infrastructure-and-routing.md).",
+    "word_count": 87,
+    "grade": "FAIL",
+    "reason": "Over word limit: 87 words (max 75)"
+  },
+  {
+    "id": "D4",
+    "query": "What is RRF?",
+    "mode": "query",
+    "response_text": "RRF (Reciprocal Rank Fusion) is a technique that combines ranked result lists from multiple retrieval methods\u2014such as dense semantic search and sparse keyword matching\u2014into a single unified ranking. It works by applying a reciprocal rank function to each result's position across the lists, then summing the scores to produce a final, balanced ranking that preserves both semantic relevance and exact term matches. In this stack, RRF is used by the qdrant-rag MCP server on port 6334 to merge dense and sparse search results for hybrid search (per architecture reference).",
+    "word_count": 89,
+    "grade": "FAIL",
+    "reason": "Over word limit: 89 words (max 75)"
+  }
+]

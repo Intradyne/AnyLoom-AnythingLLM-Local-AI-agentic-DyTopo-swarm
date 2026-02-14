@@ -68,11 +68,8 @@
 | Chat history (30 messages)              | ~12K     |
 | **Subtotal overhead**                   | **~25K** |
 | **Remaining for current exchange**      | **~55K** |
-<<<<<<< HEAD
 
-=======
-|                                         |          |
->>>>>>> 9942e327ce1dc149abe142416c07aadc36c3deec
+
 
 Room to increase Chat History to 40 or Max Context Snippets to 20 if needed. LM Studio's tool budget is higher (~6.9K tokens across ~15 tools including 8 from qdrant-rag) because it loads the full qdrant-rag server.
 
