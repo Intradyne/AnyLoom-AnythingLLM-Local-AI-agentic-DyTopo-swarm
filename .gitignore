@@ -1,0 +1,12 @@
+# Ignore Obsidian vault folders
+.obsidian/
+
+# Ignore Claude local files and caches
+.claude/
+
+# Optional: Ignore common OS and editor files
+.DS_Store
+Thumbs.db
+*.tmp
+*.log
+*~
