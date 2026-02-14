@@ -43,7 +43,7 @@ Qwen3-30B-A3B MoE · BGE-M3 hybrid embedding · dual Qdrant RAG · DyTopo multi-
    pip install tenacity>=9.0 json-repair>=0.39
    ```
 
-4. **Copy MCP config** — place `lmstudio-mcp.json` at `C:\Users\User\.lmstudio\config\mcp.json` 
+4. **Copy MCP config** — place `lmstudio-mcp.json` at `C:\Users\User\.lmstudio\config\mcp.json` !!!modify the path to point at your install!!!
 
 5. **Configure AnythingLLM** — point LLM and Embedding at `http://127.0.0.1:1234/v1`, Vector DB at `http://127.0.0.1:6333`. See [anythingllm-settings.md](docs/anythingllm-settings.md) for full settings.
 
