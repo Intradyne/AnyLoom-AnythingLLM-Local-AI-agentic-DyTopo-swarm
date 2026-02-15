@@ -54,7 +54,7 @@ AnyLoom transforms **AnythingLLM** into a dynamic, self-optimizing multi-agent s
 - **DyTopo swarm intelligence** — routes complex tasks to specialized agents
 - **Fully local execution** — no cloud dependencies, no data leakage
 
-![[Pasted image 20260214192421.png]]
+![AnyLoom Architecture Diagram](example.png)
 
 | Component                                          | Tokens                     |
 | -------------------------------------------------- | -------------------------- |

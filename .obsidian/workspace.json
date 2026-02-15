@@ -15,9 +15,9 @@
               "state": {
                 "file": "Overview-Obsidaian.canvas",
                 "viewState": {
-                  "x": -1076.744120562787,
-                  "y": -354.7986616990853,
-                  "zoom": -1.6666666666666665
+                  "x": -1579.910196903021,
+                  "y": 215.5802443412095,
+                  "zoom": 0.3333333333333332
                 }
               },
               "icon": "lucide-layout-dashboard",
@@ -185,6 +185,7 @@
   },
   "active": "1c850e238634fa58",
   "lastOpenFiles": [
+    "example.png",
     "README.md.tmp.111420.1771125088427",
     "Pasted image 20260214192421.png",
     "docs/benchmark-flow.md",
@@ -198,7 +199,6 @@
     "docs/backup_rev2/benchmarker_phase1_explanation.json",
     "docs/backup_rev2",
     "src/bench_diff.py",
-    "src/bench_compile.py",
     "Pasted image 20260214164507.png",
     "docs/benchmark-results-showcase.md",
     "prompts/benchmarker.md",
