@@ -15,9 +15,9 @@
               "state": {
                 "file": "Overview-Obsidaian.canvas",
                 "viewState": {
-                  "x": -846.7053962821562,
-                  "y": -1429.4738051668155,
-                  "zoom": -0.6666666666666667
+                  "x": -2464.2274008460945,
+                  "y": -3449.596680547181,
+                  "zoom": 0.6666666666666665
                 }
               },
               "icon": "lucide-layout-dashboard",
@@ -185,18 +185,21 @@
   },
   "active": "1c850e238634fa58",
   "lastOpenFiles": [
-    "README.md.tmp.2448.1771106522470",
-    "src/bench_phase6_showcase.py",
-    "src/bench_phase5_lmstudio.py",
-    "src/bench_phase4_stability.py",
-    "src/bench_phase3_workspace.py",
-    "src/bench_phase2_adversarial.py",
-    "src/bench_phase1_explanation.py",
+    "Pasted image 20260214192421.png",
+    "docs/benchmark-flow.md",
+    "docs/settings-manager-reference.md",
+    "src/settings_manager.py",
+    "docs/backup_rev2/benchmarker_phase6_showcase.json",
+    "docs/backup_rev2/benchmarker_phase5_lmstudio.json",
+    "docs/backup_rev2/benchmarker_phase4_stability.json",
+    "docs/backup_rev2/benchmarker_phase3_workspace.json",
+    "docs/backup_rev2/benchmarker_phase2_adversarial.json",
+    "docs/backup_rev2/benchmarker_phase1_explanation.json",
+    "docs/backup_rev2",
+    "src/bench_diff.py",
+    "src/bench_compile.py",
+    "Pasted image 20260214164507.png",
     "docs/benchmark-results-showcase.md",
-    "docs/benchmarker_phase6_showcase.json",
-    "docs/benchmarker_phase5_lmstudio.json",
-    "docs/benchmarker_phase4_stability.json",
-    "docs/benchmarker_phase3_workspace.json",
     "prompts/benchmarker.md",
     "docs/benchmark-v2-results.md",
     "prompts/benchmark-v2.md",
@@ -220,8 +223,6 @@
     "rag-docs/anythingllm/error-recovery-guide.md",
     "rag-docs/anythingllm/anythingllm-system-prompt-reference.md",
     "prompts/lm-studio-system-prompt.md",
-    "prompts/anythingllm-system-prompt.md",
-    "docs/qdrant-topology.md",
     "New folder/Overview-Obsidaian.canvas"
   ]
 }

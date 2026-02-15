@@ -74,15 +74,15 @@ The `qdrant-rag` server runs natively (not in Docker) because LM Studio spawns M
 
 ## Token Budget
 
-Each MCP tool definition consumes ~300 tokens in the system prompt. With ~15 tools across all servers (9 Docker + 3 built-in LM Studio + 8 qdrant-rag, minus duplicates and disabled), tool definitions total ~6.9K tokens.
+Each MCP tool definition consumes ~300 tokens in the system prompt. LM Studio loads 10 MCP servers (9 Docker + 1 qdrant-rag). The qdrant-rag server exposes 8 tool endpoints (5 RAG + 3 DyTopo). Total tool-definition overhead is ~6.9K tokens.
 
 ## Environment Variables
 
 | Variable | Default | Purpose |
 |---|---|---|
 | `QDRANT_URL` | `http://localhost:6334` | Qdrant REST endpoint |
-| `LMStudio_DOCS_DIR` | `./docs` (relative to script dir) | Primary markdown source directory |
-| `AnythingLLM_DOCS_DIR` | (empty — disabled) | Secondary markdown source directory |
+| `LMStudio_DOCS_DIR` | `../rag-docs/lm-studio` (relative to script dir) | Primary markdown source directory |
+| `AnythingLLM_DOCS_DIR` | `../rag-docs/anythingllm` (relative to script dir) | Secondary markdown source directory |
 | `COLLECTION_NAME` | `lmstudio_docs` | Qdrant collection name |
 | `RAG_CPU_THREADS` | `8` | OMP/MKL/torch thread count for BGE-M3 |
 | `RAG_EMBED_BATCH_SIZE` | `16` | Chunks per embedding batch |

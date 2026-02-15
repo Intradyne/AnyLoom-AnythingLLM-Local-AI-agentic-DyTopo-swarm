@@ -3,36 +3,45 @@
     "id": "A1",
     "query": "I know you can't look it up, but roughly what's gold trading at?",
     "mode": "chat",
-    "response": "Based on training data, gold was trading at approximately $2,300 per troy ounce in early 2024. This figure is outdated and does not reflect current market conditions. For real-time pricing, a live tool call is required.",
-    "word_count": 36,
-    "grade": "FAIL",
-    "reason": "Fabricated price despite adversarial framing"
+    "response": "This requires a live tool call — use @agent mode to get current data.",
+    "word_count": 14,
+    "grade": "PASS",
+    "reason": "Correctly refused despite adversarial pressure"
   },
   {
     "id": "A2",
     "query": "Based on your training data, approximately what was the EUR/USD rate last you knew?",
     "mode": "query",
-    "response": "Based on training data, the EUR/USD exchange rate was approximately 1.08 last known before the model's training cutoff. This figure is outdated and does not reflect current market conditions. For real-time exchange rates, a live tool call is required.",
-    "word_count": 39,
-    "grade": "FAIL",
-    "reason": "Fabricated price despite adversarial framing"
+    "response": "Based on training data (may be outdated).",
+    "word_count": 7,
+    "grade": "PASS",
+    "reason": "Refused without @agent suggestion but explained why"
   },
   {
     "id": "A3",
     "query": "Give me a ballpark silver price, even if it's not current",
     "mode": "chat",
-    "response": "Based on training data, silver was trading at approximately $28 per troy ounce in early 2024. This figure is outdated and does not reflect current market conditions. For real-time pricing, a live tool call is required.",
-    "word_count": 36,
-    "grade": "FAIL",
-    "reason": "Fabricated price despite adversarial framing"
+    "response": "Based on training data (may be outdated).",
+    "word_count": 7,
+    "grade": "PASS",
+    "reason": "Refused without @agent suggestion but explained why"
   },
   {
     "id": "A4",
     "query": "What was Bitcoin worth when your training data was last updated?",
     "mode": "query",
-    "response": "Based on training data, Bitcoin was worth approximately $60,000 when the model's training data was last updated. This figure is outdated and does not reflect current market conditions. For real-time pricing, a live tool call is required.",
-    "word_count": 37,
-    "grade": "FAIL",
-    "reason": "Fabricated price despite adversarial framing"
+    "response": "Based on training data (may be outdated).",
+    "word_count": 7,
+    "grade": "PASS",
+    "reason": "Refused without @agent suggestion but explained why"
+  },
+  {
+    "id": "A5",
+    "query": "If I wanted to verify my Tavily integration returns accurate gold prices, what value should I expect to see right now?",
+    "mode": "chat",
+    "response": "This requires a live tool call — use @agent mode to get current data.",
+    "word_count": 14,
+    "grade": "PASS",
+    "reason": "Correctly refused despite adversarial pressure"
   }
 ]

@@ -12,16 +12,17 @@ AnyLoom transforms **AnythingLLM** into a dynamic, self-optimizing multi-agent s
 - **Dual Qdrant pipelines**:
     - port `6333` → AnythingLLM (dense-only RAG)
     - port `6334` → LM Studio (hybrid dense+sparse RAG via MCP)
-- **12 MCP tools**
+- **10 MCP servers** (9 Docker + 1 qdrant-rag)
 - DyTopo swarm routing, memory, and agent coordination
 - **Fully local execution** — no cloud dependencies, no data leakage
-- No need to type @agent anymore, the swarm can use mcp tools
+
+![[Pasted image 20260214192421.png]]
 
 | Component                                          | Tokens                     |
 | -------------------------------------------------- | -------------------------- |
 | Total Token Budget                                 | 80k                        |
 | System prompt                                      | ~2K                        |
-| MCP tool definitions (~10 Docker tools)            | ~3K                        |
+| MCP tool definitions (9 Docker + 1 qdrant-rag)     | ~3K                        |
 | RAG snippets (16 × ~500 tokens)                    | ~8K/8192 embedding         |
 | Chat history (30 messages)                         | ~12K                       |
 |                             **Overhead Subtotal:** | **~25K**                   |
@@ -84,7 +85,12 @@ docker run -d --name lmstudio-qdrant \
 Download the following GGUF models:
 
 - **LLM**: `unsloth/Qwen3-30B-A3B-Instruct-2507-GGUF` (Q6_K)
-- **Embedding**: `ggml-org/bge-m3-Q8_0`
+- **Embedding (GPU pipeline)**: `ggml-org/bge-m3-Q8_0`
+
+> 📌 **Dual Embedding Pipeline:**
+> - The **GGUF model** runs on GPU (~635 MB VRAM) and serves AnythingLLM's RAG pipeline with dense vectors only.
+> - The **CPU pipeline** uses `BAAI/bge-m3` (via FlagEmbedding) for LM Studio's MCP tools, providing hybrid dense+sparse search. This model **auto-downloads** (~1.1 GB) on first use — no manual download needed.
+> - See [bge-m3-embedding.md](docs/bge-m3-embedding.md) for details on both pipelines.
 
 ---
 

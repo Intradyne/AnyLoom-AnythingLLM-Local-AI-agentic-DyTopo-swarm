@@ -76,9 +76,15 @@ QDRANT_URL = os.environ.get("QDRANT_URL", "http://localhost:6334")
 COLLECTION = os.environ.get("COLLECTION_NAME", "lmstudio_docs")
 
 # Multi-source doc directories (canvas state: LMStudio + AnythingLLM)
-_default_docs = os.path.join(os.path.dirname(__file__), "docs")
-LMStudio_DOCS_DIR = os.environ.get("LMStudio_DOCS_DIR", _default_docs)
-AnythingLLM_DOCS_DIR = os.environ.get("AnythingLLM_DOCS_DIR", "")
+_project_root = os.path.join(os.path.dirname(__file__), "..")
+LMStudio_DOCS_DIR = os.environ.get(
+    "LMStudio_DOCS_DIR",
+    os.path.join(_project_root, "rag-docs", "lm-studio"),
+)
+AnythingLLM_DOCS_DIR = os.environ.get(
+    "AnythingLLM_DOCS_DIR",
+    os.path.join(_project_root, "rag-docs", "anythingllm"),
+)
 
 # Build source map: label → path (non-empty paths only)
 DOC_SOURCES: dict[str, str] = {}

@@ -1,4 +1,8 @@
-import requests, json, re, time
+import requests, json, re, time, sys, os
+
+# Suppress requests urllib3 warnings
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 BASE = "http://localhost:3001/api/v1"
 KEY  = ""
@@ -69,7 +73,7 @@ def send_lmstudio(message, system_prompt):
     r = requests.post(
         "http://localhost:1234/v1/chat/completions",
         json={
-            "model": "qwen3-30b-a3b",
+            "model": "qwen3-30b-a3b-instruct-2507",
             "temperature": 0.1,
             "messages": [
                 {"role": "system", "content": system_prompt},

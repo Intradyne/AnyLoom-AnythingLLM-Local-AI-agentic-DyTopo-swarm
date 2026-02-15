@@ -63,7 +63,7 @@
 | Component                               | Tokens   |
 | --------------------------------------- | -------- |
 | System prompt                           | ~2K      |
-| MCP tool definitions (~10 Docker tools) | ~3K      |
+| MCP tool definitions (9 Docker servers)  | ~3K      |
 | RAG snippets (16 × ~500 tokens)         | ~8K      |
 | Chat history (30 messages)              | ~12K     |
 | **Subtotal overhead**                   | **~25K** |
@@ -71,7 +71,7 @@
 
 
 
-Room to increase Chat History to 40 or Max Context Snippets to 20 if needed. LM Studio's tool budget is higher (~6.9K tokens across ~15 tools including 8 from qdrant-rag) because it loads the full qdrant-rag server.
+Room to increase Chat History to 40 or Max Context Snippets to 20 if needed. LM Studio's tool budget is higher (~6.9K tokens across 10 MCP servers including qdrant-rag with 8 tool endpoints) because it loads the full qdrant-rag server.
 
 
 

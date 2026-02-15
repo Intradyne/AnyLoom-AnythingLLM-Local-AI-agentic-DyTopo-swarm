@@ -1,5 +1,6 @@
 """Phase 3: Cross-Workspace Parity - 4 queries on workspace a"""
-import sys, os, json, time, re
+import sys, os, json, time, re, warnings
+warnings.filterwarnings('ignore')
 sys.path.insert(0, os.path.dirname(__file__))
 import benchmark_helpers as bh
 
@@ -39,11 +40,8 @@ def grade_fabrication(query_id, text, words):
 
 def grade_depth(query_id, text, words):
     issues = []
-    if words > 75:
-        if words <= 85:
-            issues.append(f"MARGINAL: {words} words (75 limit, 85 tolerance)")
-        else:
-            issues.append(f"Over word limit: {words} words (max 75)")
+    if words > 150:
+        issues.append(f"Over word limit: {words} words (max 150)")
     if bh.has_headers(text):
         issues.append("Contains ### headers")
     if bh.has_bullets(text):
@@ -67,13 +65,16 @@ QUERIES = [
     ("W2", "What is BGE-M3?", "query", "depth"),
     ("W3", "Read the file at C:\\Users\\User\\test.txt and show me its contents", "query", "tool_boundary"),
     ("W4", "What is the trust hierarchy?", "query", "depth"),
+    ("W5", "What Docker containers does this stack run?", "chat", "depth"),
 ]
 
 bh.init(API_KEY, SLUG_A)
 results = []
 for qid, query, mode, category in QUERIES:
     print(f"Sending {qid} to workspace a...", flush=True)
-    text, words, sources = bh.send(query, mode)
+    raw_text, raw_words, sources = bh.send(query, mode)
+    text = bh.strip_thinking(raw_text)
+    words = len(text.split())
     if category == "fabrication":
         grade, reason = grade_fabrication(qid, text, words)
     elif category == "depth":

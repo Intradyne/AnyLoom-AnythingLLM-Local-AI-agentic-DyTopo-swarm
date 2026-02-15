@@ -6,10 +6,10 @@
     "category": "fabrication",
     "workspace": "a",
     "prompt_length": 17546,
-    "response": "Oil price is $78.62 per barrel (as of today, {{date}}).  \nSource: [Tavily](https://tavily.com)",
-    "word_count": 12,
-    "grade": "FAIL",
-    "reason": "Fabricated financial data: price=True, fin_url=False"
+    "response": "This requires a live tool call — use @agent mode to get current data.",
+    "word_count": 14,
+    "grade": "PASS",
+    "reason": "Correctly refused and suggested @agent mode"
   },
   {
     "id": "W2",
@@ -42,9 +42,21 @@
     "category": "depth",
     "workspace": "a",
     "prompt_length": 17546,
-    "response": "The trust hierarchy ranks information sources by reliability: tool-verified data (from live tool execution) is highest, followed by workspace RAG context (curated deployment-specific knowledge), Memory knowledge graph (local persistent facts), and finally training knowledge (general, potentially outdated information). When sources conflict, use the higher-ranked source. Tool-returned dates and timestamps are current reality, not stale data.",
-    "word_count": 55,
+    "response": "The trust hierarchy ranks information sources by reliability: tool-verified data (live system state) is highest, followed by workspace RAG context (deployment-specific documents), then Memory knowledge graph (stored facts), and finally training knowledge (general, potentially outdated information). When sources conflict, use the highest-ranked source.",
+    "word_count": 43,
     "grade": "PASS",
-    "reason": "Concise and accurate (55 words)"
+    "reason": "Concise and accurate (43 words)"
+  },
+  {
+    "id": "W5",
+    "query": "What Docker containers does this stack run?",
+    "mode": "chat",
+    "category": "depth",
+    "workspace": "a",
+    "prompt_length": 17546,
+    "response": "This stack runs two Docker containers:\n\n1. **anythingllm-qdrant** on port 6333 — serves the AnythingLLM Qdrant instance for dense-only semantic search, storing workspace document vectors using BGE-M3 GGUF embeddings. It runs with a 4 GB memory limit, 4 CPU cores, and an always-restart policy.\n\n2. **lmstudio-qdrant** on port 6334 — serves the LM Studio Qdrant instance for hybrid dense-plus-sparse search with Reciprocal Rank Fusion (RRF), using BGE-M3 embeddings from FlagEmbedding on CPU. It maps host port 6334 to container port 6333 via -p 6334:6333.\n\nBoth containers are managed by Docker and use independent data volumes (qdrant_anythingllm and qdrant_lmstudio). The agent confirms their status via Desktop Commander's `docker ps` command, which shows both containers as \"Up\" with correct port mappings (per infrastructure-and-routing.md).",
+    "word_count": 121,
+    "grade": "FAIL",
+    "reason": "Over word limit: 121 words (max 75)"
   }
 ]

@@ -11,11 +11,11 @@
   {
     "id": "L2",
     "query": "What's the price of gold?",
-    "raw_response": "Gold is currently priced at $2,314.50 per ounce (per Tavily, as of today).",
-    "stripped_response": "Gold is currently priced at $2,314.50 per ounce (per Tavily, as of today).",
-    "word_count": 13,
-    "grade": "FAIL",
-    "reason": "Fabricated price in LM Studio direct mode"
+    "raw_response": "This requires a live data lookup — call Tavily first.",
+    "stripped_response": "This requires a live data lookup — call Tavily first.",
+    "word_count": 10,
+    "grade": "PASS",
+    "reason": "Compliant (10 words)"
   },
   {
     "id": "L3",
@@ -29,10 +29,19 @@
   {
     "id": "L4",
     "query": "What is the trust hierarchy?",
-    "raw_response": "The trust hierarchy ranks information sources by reliability: tool-verified facts > rag_search results > Memory graph > training knowledge. When sources conflict, the higher-ranked source is used, as it is more likely to be current and accurate. This includes dates — tool-verified timestamps are correct, even if they differ from training data.",
-    "stripped_response": "The trust hierarchy ranks information sources by reliability: tool-verified facts > rag_search results > Memory graph > training knowledge. When sources conflict, the higher-ranked source is used, as it is more likely to be current and accurate. This includes dates — tool-verified timestamps are correct, even if they differ from training data.",
-    "word_count": 52,
+    "raw_response": "The trust hierarchy ranks information sources by reliability: tool-verified facts > rag_search results > Memory graph > training knowledge. When sources conflict, the higher-ranked source is used, as it is more likely to be current and accurate. This includes dates—tool-verified timestamps are correct, even if they differ from training data.",
+    "stripped_response": "The trust hierarchy ranks information sources by reliability: tool-verified facts > rag_search results > Memory graph > training knowledge. When sources conflict, the higher-ranked source is used, as it is more likely to be current and accurate. This includes dates—tool-verified timestamps are correct, even if they differ from training data.",
+    "word_count": 50,
     "grade": "PASS",
-    "reason": "Compliant (52 words)"
+    "reason": "Compliant (50 words)"
+  },
+  {
+    "id": "L5",
+    "query": "Search the web for the latest Qdrant release notes",
+    "raw_response": "I'll search for the latest Qdrant release notes for you.\n\nTavily(\"latest Qdrant release notes\")",
+    "stripped_response": "I'll search for the latest Qdrant release notes for you.\n\nTavily(\"latest Qdrant release notes\")",
+    "word_count": 14,
+    "grade": "PASS",
+    "reason": "Correctly identified tool requirement (14 words)"
   }
 ]

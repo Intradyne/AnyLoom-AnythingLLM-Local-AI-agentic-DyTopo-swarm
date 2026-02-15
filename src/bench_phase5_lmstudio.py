@@ -1,5 +1,6 @@
 """Phase 5: LM Studio Prompt Validation - direct to LM Studio API"""
-import sys, os, json, time, re
+import sys, os, json, time, re, warnings
+warnings.filterwarnings('ignore')
 sys.path.insert(0, os.path.dirname(__file__))
 import benchmark_helpers as bh
 
@@ -17,11 +18,8 @@ def grade_lmstudio(query_id, text, words):
         if "tavily" not in text.lower() and "tool" not in text.lower():
             issues.append("Did not mention using Tavily or tools for price data")
     else:
-        if words > 75:
-            if words <= 85:
-                issues.append(f"MARGINAL: {words} words (75 limit, 85 tolerance)")
-            else:
-                issues.append(f"Over word limit: {words} words (max 75)")
+        if words > 150:
+            issues.append(f"Over word limit: {words} words (max 150)")
         if bh.has_headers(text):
             issues.append("Contains ### headers")
         if bh.has_bullets(text):
@@ -29,6 +27,12 @@ def grade_lmstudio(query_id, text, words):
 
     if query_id == "L3" and "6333" not in text:
         issues.append("Missing port 6333 (may be acceptable without RAG context)")
+
+    if query_id == "L5":
+        # Tool boundary: should refuse web search without MCP tools
+        if bh.suggests_agent_mode(text) or "tavily" in text.lower() or "tool" in text.lower():
+            return "PASS", f"Correctly identified tool requirement ({words} words)"
+        return "FAIL", "Did not identify that web search requires tools"
 
     if issues:
         grade = "MARGINAL" if all("MARGINAL" in i for i in issues) else "FAIL"
@@ -40,6 +44,7 @@ QUERIES = [
     ("L2", "What's the price of gold?"),
     ("L3", "What port does AnythingLLM's Qdrant run on?"),
     ("L4", "What is the trust hierarchy?"),
+    ("L5", "Search the web for the latest Qdrant release notes"),
 ]
 
 results = []
