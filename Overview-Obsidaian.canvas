@@ -1,6 +1,6 @@
 {
 	"nodes":[
-		{"id":"78c28d9b4306edd4","x":-2122,"y":-1241,"width":250,"height":60,"type":"text","text":""},
+		{"id":"78c28d9b4306edd4","type":"text","text":"","x":-2122,"y":-1241,"width":250,"height":60},
 		{"id":"3d568fa5e79cc104","type":"file","file":"prompts/lm-studio-system-prompt.md","x":1320,"y":-1720,"width":520,"height":6880},
 		{"id":"3c3bfc424d4ae68d","type":"file","file":"docs/qwen3-model.md","x":3610,"y":-1080,"width":710,"height":2140},
 		{"id":"f1a2b3c4e5f60010","type":"file","file":"docs/dytopo-swarm.md","x":3610,"y":-2860,"width":710,"height":1680},
@@ -30,7 +30,7 @@
 		{"id":"f1a2b3c4e5f60013","type":"file","file":"docs/benchmark-results-showcase.md","x":-2960,"y":-1720,"width":760,"height":9240},
 		{"id":"a1b2c3d4e5f60003","type":"text","text":"**Source Code (`src/`)**\n\n**qdrant_mcp_server.py** (~1800 lines)\nMCP server: 5 RAG + 3 DyTopo tools\nBGE-M3 FlagEmbedding on CPU\nHybrid dense+sparse with RRF\nDyTopo swarm (MiniLM routing)\n\n**reindex.py**\nForce-reindex RAG docs → Qdrant 6334\nSHA-256 content-hash dedup\n\n**benchmark_helpers.py**\nAnythingLLM + LM Studio API clients\nGrading helpers (fabrication, depth, tools)\nQwen3 `<think>` tag stripping","x":-3440,"y":-1340,"width":440,"height":360},
 		{"id":"a1b2c3d4e5f60002","type":"text","text":"**Benchmark & Testing**\n\nV1: 20/25 (80%) — baseline all categories\nV2: 10/12 (83%) — gap-closure + topN sweep\nFinal: 10/16 (63%) — adversarial + explanation tier\n\nKey findings:\n- Direct price refusal: bulletproof since V2\n- Adversarial framing: drove Rev6 HARD STOP broadening\n- Explanation tier (50-150w): structural limitation\n- Depth driven by prompt examples, not topN\n\n`docs/benchmark-results-showcase.md`\n`prompts/benchmarker.md`","x":-3440,"y":-1720,"width":440,"height":380},
-		{"id":"77ddebe54844783b","type":"file","file":"README.md","x":-2160,"y":-1720,"width":760,"height":5020}
+		{"id":"77ddebe54844783b","type":"file","file":"README.md","x":-2160,"y":-1720,"width":760,"height":6680}
 	],
 	"edges":[
 		{"id":"90fb57806b6e948b","fromNode":"74a6aa6bb5b8beab","fromSide":"bottom","toNode":"487af9359d013e6d","toSide":"top"},

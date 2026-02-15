@@ -15,9 +15,9 @@
               "state": {
                 "file": "Overview-Obsidaian.canvas",
                 "viewState": {
-                  "x": -2464.2274008460945,
-                  "y": -3449.596680547181,
-                  "zoom": 0.6666666666666665
+                  "x": -1076.744120562787,
+                  "y": -354.7986616990853,
+                  "zoom": -1.6666666666666665
                 }
               },
               "icon": "lucide-layout-dashboard",
@@ -185,6 +185,7 @@
   },
   "active": "1c850e238634fa58",
   "lastOpenFiles": [
+    "README.md.tmp.111420.1771125088427",
     "Pasted image 20260214192421.png",
     "docs/benchmark-flow.md",
     "docs/settings-manager-reference.md",

@@ -1,19 +1,57 @@
 # AnyLoom: AnythingLLM Local AI Agentic Stack
 
-**A fully local, multi-agent AI system powered by Qwen3-30B-A3B MoE, BGE-M3 hybrid embeddings, and dual Qdrant RAG pipelines — orchestrated via DyTopo swarm intelligence and MCP tooling.**
+**A fully local, multi-agent AI system that gives you ChatGPT-level intelligence with complete privacy and control over your data.**
 
 ---
 
-## 🌐 Overview
+## 💡 What Can You Do With This?
+
+**Run a production-grade AI assistant stack entirely on your hardware:**
+
+- 🔒 **100% private** — No data leaves your machine. No API keys. No subscriptions.
+- 🧠 **Advanced reasoning** — Qwen3-30B with 80K context handles complex tasks, multi-step planning, and long documents
+- 📚 **Hybrid RAG search** — Finds YOUR information better than pure vector search (dense + sparse retrieval)
+- 🤖 **Multi-agent swarm** — DyTopo coordination routes complex tasks to specialized agents that collaborate
+- 🛠️ **10 MCP tools** — Memory, web search, browser automation, file operations, code execution, persistent knowledge graphs
+- 💬 **Two AI interfaces**:
+  - **AnythingLLM** — Clean UI for chat, document Q&A, voice I/O
+  - **LM Studio** + Custom server.py Advanced agent mode with tool orchestration
+
+**Ideal for:**
+- Engineers who need AI assistance with proprietary codebases
+- Researchers handling sensitive documents (legal, medical, financial)
+- Privacy-conscious users who want ChatGPT-level capability without cloud dependency
+- Developers building custom AI workflows with persistent memory and multi-agent collaboration
+
+---
+
+## 🧠 Why AnyLoom vs Cloud AI or Single-LLM Setups?
+
+|                       | 🧠AnyLoom🧠                                  | Cloud AI (ChatGPT, Claude)      | Single Local LLM          |
+| --------------------- | -------------------------------------------- | ------------------------------- | ------------------------- |
+| **Privacy**           | ✅ 100% local, zero telemetry                 | ❌ Your data trains their models | ✅ Local                   |
+| **Cost**              | ✅ One-time hardware investment               | ❌ $20-200/month subscription    | ✅ Free after setup        |
+| **Retrieval Quality** | ✅ Hybrid dense+sparse RAG                    | ⚠️ Dense-only embeddings        | ⚠️ Basic or no RAG        |
+| **Multi-Agent Swarm** | ✅ DyTopo routing, 3-5 agents                 | ❌ Single model per request      | ❌ Single model            |
+| **Persistent Memory** | ✅ MCP knowledge graph across sessions        | ⚠️ Limited to conversation      | ❌ No cross-session memory |
+| **Tool Ecosystem**    | ✅ 10 MCP servers (web, code, files, browser) | ⚠️ Limited, cloud-gated         | ❌ Manual integration      |
+| **Context Window**    | ✅ 80K tokens (~200K chars)                   | ⚠️ 128K (expensive tiers)       | ⚠️ Varies by model        |
+| **Offline Use**       | ✅ Fully functional                           | ❌ Requires internet             | ✅ Fully functional        |
+
+**The bottom line:** If you need ChatGPT-level capability for sensitive work, AnyLoom gives you near the same intelligence without the privacy trade-offs or subscription costs.
+
+---
+
+## 🌐 How It Works
 
 AnyLoom transforms **AnythingLLM** into a dynamic, self-optimizing multi-agent swarm using:
 
-- **Hybrid RAG fusion** (dense + sparse retrieval)
+- **Hybrid RAG fusion** (dense + sparse retrieval) — better recall than pure vector search
 - **Dual Qdrant pipelines**:
     - port `6333` → AnythingLLM (dense-only RAG)
     - port `6334` → LM Studio (hybrid dense+sparse RAG via MCP)
-- **10 MCP servers** (9 Docker + 1 qdrant-rag)
-- DyTopo swarm routing, memory, and agent coordination
+- **10 MCP servers** (9 Docker + 1 qdrant-rag) — memory, tools, and agent coordination
+- **DyTopo swarm intelligence** — routes complex tasks to specialized agents
 - **Fully local execution** — no cloud dependencies, no data leakage
 
 ![[Pasted image 20260214192421.png]]
@@ -188,16 +226,6 @@ Full reference documentation is available in the `docs/` directory:
 - **Container Management**: Use `docker ps`, `docker logs`, and `docker stop` for diagnostics.
 - **Model Updates**: Re-download GGUF models in LM Studio when needed.
 - **RAG Re-indexing**: Re-embed documents via AnythingLLM or MCP CLI.
-
----
-
-## 🧠 Why AnyLoom?
-
-- **No cloud dependency** — all data stays local
-- **Hybrid RAG fusion** — better recall than pure dense or sparse
-- **Dynamic agent swarm** — DyTopo routes tasks to optimal agents
-- **MCP-powered memory** — persistent state, preferences, and agent history
-- **100% local** — ideal for privacy, compliance, and offline use
 
 ---
 
