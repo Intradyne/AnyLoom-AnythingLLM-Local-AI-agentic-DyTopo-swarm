@@ -12,7 +12,7 @@
 - 🧠 **Advanced reasoning** — Qwen3-30B with 80K context handles complex tasks, multi-step planning, and long documents
 - 📚 **Hybrid RAG search** — Finds YOUR information better than pure vector search (dense + sparse retrieval)
 - 🤖 **Multi-agent swarm** — DyTopo coordination routes complex tasks to specialized agents that collaborate
-- 🛠️ **10 MCP tools** — Memory, web search, browser automation, file operations, code execution, persistent knowledge graphs
+- 🛠️ **17 MCP tools** — Memory, web search, browser automation, file operations, code execution, persistent knowledge graphs
 - 💬 **Two AI interfaces**:
   - **AnythingLLM** — Clean UI for chat, document Q&A, voice I/O
   - **LM Studio** + Custom server.py Advanced agent mode with tool orchestration
@@ -50,7 +50,7 @@ AnyLoom transforms **AnythingLLM** into a dynamic, self-optimizing multi-agent s
 - **Dual Qdrant pipelines**:
     - port `6333` → AnythingLLM (dense-only RAG)
     - port `6334` → LM Studio (hybrid dense+sparse RAG via MCP)
-- **10 MCP servers** (9 Docker + 1 qdrant-rag) — memory, tools, and agent coordination
+- **10 MCP servers** (9 Docker + 1 qdrant-rag) — memory, tools, and agent coordination (17 total tools)
 - **DyTopo swarm intelligence** — routes complex tasks to specialized agents
 - **Fully local execution** — no cloud dependencies, no data leakage
 
@@ -144,7 +144,9 @@ pip install \
   networkx>=3.0 \
   openai>=1.40 \
   tenacity>=9.0 \
-  json-repair>=0.39
+  json-repair>=0.39 \
+  pydantic>=2.0 \
+  pyyaml>=6.0
 ```
 
 ---
@@ -195,7 +197,7 @@ Run these checks:
 |LM Studio|`http://127.0.0.1:1234/v1`|Returns JSON (model loaded)|
 |Qdrant (6333)|[http://localhost:6333](http://localhost:6333)|Dashboard accessible|
 |Qdrant (6334)|[http://localhost:6334](http://localhost:6334)|Dashboard accessible|
-|MCP Tools|Restart LM Studio|**8 tools** should appear (5 RAG + 3 DyTopo)|
+|MCP Tools|Restart LM Studio|**8 qdrant-rag tools** should appear (5 RAG + 3 DyTopo)|
 |AnythingLLM|Create workspace, embed test doc, query|Success|
 
 > ⚠️ If containers aren't running, you'll get connection errors.
@@ -213,10 +215,23 @@ Full reference documentation is available in the `docs/` directory:
 | `bge-m3-embedding.md` | BGE-M3 dual pipeline (GGUF + FlagEmbedding) |
 | `qdrant-topology.md` | Dual Qdrant instances, collection schema, sync |
 | `qdrant-servers.md` | MCP server inventory, tool definitions, token budget |
-| `dytopo-swarm.md` | DyTopo multi-agent routing, domains, lifecycle |
+| `dytopo-swarm.md` | DyTopo multi-agent routing, package architecture, domains, lifecycle |
 | `anythingllm-settings.md` | AnythingLLM provider config, chunking, workspace |
 | `lm-studio-settings.md` | LM Studio model settings, sampling, API consumers |
 | `benchmark-results-showcase.md` | Benchmark results across all rounds |
+
+### DyTopo Package (`src/dytopo/`)
+
+| Module | Purpose |
+|--------|---------|
+| `models.py` | Pydantic v2 data models (AgentState, SwarmTask, SwarmMetrics, etc.) |
+| `config.py` | YAML configuration loader with defaults (`dytopo_config.yaml`) |
+| `agents.py` | System prompts, JSON schemas, domain rosters |
+| `router.py` | MiniLM-L6-v2 embedding, cosine similarity, threshold, degree cap |
+| `graph.py` | NetworkX DAG construction, cycle breaking, topological sort |
+| `orchestrator.py` | Main swarm loop with singleton AsyncOpenAI client |
+| `governance.py` | Convergence detection, stalling detection, re-delegation |
+| `audit.py` | JSONL audit logging to `~/dytopo-logs/{task_id}/` |
 
 ---
 

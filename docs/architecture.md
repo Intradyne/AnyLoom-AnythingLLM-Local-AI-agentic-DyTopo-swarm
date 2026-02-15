@@ -39,9 +39,9 @@
 │     dense + sparse, RRF  │  │   │  Port 6333 (REST)    │
 │     ~2.3 GB RAM          │  │   │  AnythingLLM instance │
 │                          │  │   │  Dense vectors only   │
-│     DyTopo Swarm:        │  │   └──────────────────────┘
-│     MiniLM-L6-v2 on CPU  │  │
-│     routing embeddings   │  │   ┌──────────────────────┐
+│     DyTopo Package:      │  │   └──────────────────────┘
+│     src/dytopo/ (8 mods) │  │
+│     MiniLM-L6-v2 on CPU  │  │   ┌──────────────────────┐
 │     ~80 MB RAM           │  └──▶│  Qdrant (Docker)     │
 │     3 domains, 3–5 rds   │      │  Port 6334 (REST)    │
 │     τ=0.3 threshold      │      │  LM Studio instance   │
@@ -89,6 +89,6 @@ LM Studio serves as the GPU inference backbone, hosting both the Qwen3-30B-A3B c
 
 AnythingLLM provides a workspace-based RAG interface with its own document ingestion pipeline. It connects to LM Studio for both LLM inference and embedding generation, and stores its vectors in a dedicated Qdrant instance on port 6333. Its chunking strategy uses 6600-character chunks with 1000-character overlap, retrieving 16 snippets at low similarity threshold with 30-message conversation history.
 
-The MCP server ecosystem splits across two transports. Nine containerized servers run through the Docker MCP Gateway, providing system commands, file operations, a local knowledge graph, library docs, web search, URL fetching, browser automation, multi-step reasoning, and workflow automation. The native Python `qdrant-rag` server runs directly on the host, implementing hybrid dense+sparse RAG search with RRF fusion using BGE-M3 on CPU (~2.3 GB RAM), and DyTopo multi-agent swarm orchestration using MiniLM-L6-v2 for descriptor routing (~80 MB RAM).
+The MCP server ecosystem splits across two transports. Nine containerized servers run through the Docker MCP Gateway, providing system commands, file operations, a local knowledge graph, library docs, web search, URL fetching, browser automation, multi-step reasoning, and workflow automation. The native Python `qdrant-rag` server runs directly on the host, implementing hybrid dense+sparse RAG search with RRF fusion using BGE-M3 on CPU (~2.3 GB RAM), and DyTopo multi-agent swarm orchestration using MiniLM-L6-v2 for descriptor routing (~80 MB RAM). DyTopo is structured as a dedicated Python package (`src/dytopo/`) with 8 modules: `models.py` (Pydantic v2 data models), `config.py` (YAML configuration loader), `agents.py` (system prompts, JSON schemas, domain rosters), `router.py` (MiniLM embedding and similarity routing), `graph.py` (NetworkX DAG construction), `orchestrator.py` (main swarm loop with singleton AsyncOpenAI client), `governance.py` (convergence/stalling detection), and `audit.py` (JSONL audit logging). The server exposes 3 thin MCP tools (`swarm_start`, `swarm_status`, `swarm_result`) that delegate to this package.
 
 Two independent Qdrant Docker containers serve the two RAG pipelines. The AnythingLLM instance on port 6333 stores dense-only vectors from AnythingLLM's embedding pipeline. The MCP server instance on port 6334 stores hybrid dense+sparse vectors with RRF fusion, payload-indexed by source file and source directory for filtered retrieval across multiple document sources.

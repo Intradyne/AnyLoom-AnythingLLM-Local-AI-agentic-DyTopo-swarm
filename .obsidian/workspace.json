@@ -15,9 +15,9 @@
               "state": {
                 "file": "Overview-Obsidaian.canvas",
                 "viewState": {
-                  "x": -1579.910196903021,
-                  "y": 215.5802443412095,
-                  "zoom": 0.3333333333333332
+                  "x": -1260.398964534473,
+                  "y": -3168.5319582768793,
+                  "zoom": -0.6666666666666665
                 }
               },
               "icon": "lucide-layout-dashboard",
@@ -185,20 +185,24 @@
   },
   "active": "1c850e238634fa58",
   "lastOpenFiles": [
+    "LICENSE.txt",
+    "New Rich Text Document.rtf",
+    "tests/test_dytopo.py",
+    "fix_indent.py",
+    "src/dytopo/audit.py",
+    "src/dytopo/governance.py",
+    "src/dytopo/__pycache__/graph.cpython-314.pyc",
+    "src/dytopo/__pycache__/router.cpython-314.pyc",
+    "src/dytopo/__pycache__/orchestrator.cpython-314.pyc",
+    "src/dytopo/__pycache__/agents.cpython-314.pyc",
+    "src/dytopo/__pycache__/config.cpython-314.pyc",
+    "dytopo/GOVERNANCE_SUMMARY.md",
+    "dytopo/INTEGRATION_EXAMPLE.md",
+    "dytopo/README.md",
     "example.png",
-    "README.md.tmp.111420.1771125088427",
     "Pasted image 20260214192421.png",
     "docs/benchmark-flow.md",
     "docs/settings-manager-reference.md",
-    "src/settings_manager.py",
-    "docs/backup_rev2/benchmarker_phase6_showcase.json",
-    "docs/backup_rev2/benchmarker_phase5_lmstudio.json",
-    "docs/backup_rev2/benchmarker_phase4_stability.json",
-    "docs/backup_rev2/benchmarker_phase3_workspace.json",
-    "docs/backup_rev2/benchmarker_phase2_adversarial.json",
-    "docs/backup_rev2/benchmarker_phase1_explanation.json",
-    "docs/backup_rev2",
-    "src/bench_diff.py",
     "Pasted image 20260214164507.png",
     "docs/benchmark-results-showcase.md",
     "prompts/benchmarker.md",
@@ -221,9 +225,6 @@
     "rag-docs/anythingllm/output-and-trust-standards.md",
     "rag-docs/anythingllm/infrastructure-and-routing.md",
     "rag-docs/anythingllm/tool-reference.md",
-    "rag-docs/anythingllm/error-recovery-guide.md",
-    "rag-docs/anythingllm/anythingllm-system-prompt-reference.md",
-    "prompts/lm-studio-system-prompt.md",
     "New folder/Overview-Obsidaian.canvas"
   ]
 }

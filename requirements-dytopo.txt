@@ -1,0 +1,7 @@
+openai>=1.40
+tenacity>=9.0
+json-repair>=0.39
+pyyaml>=6.0
+networkx>=3.0
+sentence-transformers>=3.0
+pydantic>=2.0
