@@ -30,3 +30,10 @@ logging:
   # save_similarity_matrices: true
   # save_raw_responses: false
   # console_verbosity: "info"
+
+concurrency:
+  backend: "lmstudio"       # "lmstudio" (sequential) or "vllm" (parallel)
+  max_concurrent: 1         # set to 8 when using vllm
+  # vllm_base_url: "http://localhost:8000/v1"
+  # connect_timeout: 10.0
+  # read_timeout: 180.0

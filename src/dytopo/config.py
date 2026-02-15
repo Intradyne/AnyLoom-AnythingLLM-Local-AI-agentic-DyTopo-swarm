@@ -44,6 +44,13 @@ _DEFAULTS = {
         "save_raw_responses": False,
         "console_verbosity": "info",
     },
+    "concurrency": {
+        "backend": "lmstudio",          # "lmstudio" or "vllm"
+        "max_concurrent": 1,            # 1 for lmstudio (sequential), 8 for vllm
+        "vllm_base_url": "http://localhost:8000/v1",
+        "connect_timeout": 10.0,
+        "read_timeout": 180.0,
+    },
 }
 
 

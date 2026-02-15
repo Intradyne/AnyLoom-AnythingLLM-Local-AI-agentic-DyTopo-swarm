@@ -1,6 +1,5 @@
-"""Ensure src/ is on sys.path before the project root so that
-``import dytopo`` resolves to ``src/dytopo/`` (the full 8-module
-package) instead of the legacy ``dytopo/`` directory at the repo root.
+"""Ensure src/ is on sys.path so that ``import dytopo`` resolves to
+``src/dytopo/`` (the full package).
 """
 
 import sys

@@ -218,7 +218,7 @@ Full reference documentation is available in the `docs/` directory:
 | `dytopo-swarm.md` | DyTopo multi-agent routing, package architecture, domains, lifecycle |
 | `anythingllm-settings.md` | AnythingLLM provider config, chunking, workspace |
 | `lm-studio-settings.md` | LM Studio model settings, sampling, API consumers |
-| `benchmark-results-showcase.md` | Benchmark results across all rounds |
+| [`benchmark-results-showcase.md`](scripts/benchmarks/docs/benchmark-results-showcase.md) | Benchmark results across all rounds |
 
 ### DyTopo Package (`src/dytopo/`)
 

@@ -9,11 +9,20 @@ Reasoning via Semantic Matching" (Lu et al., Feb 2026)
 
 Core modules:
 - models: Pydantic v2 data structures (SwarmTask, AgentState, etc.)
-- config: YAML configuration loader with defaults
+- config: YAML configuration loader with defaults + concurrency backend
 - agents: System prompts, domain configs, roster builder
 - router: Embedding, similarity matrix, threshold, degree cap
-- graph: DAG construction, cycle breaking, topological sort
-- orchestrator: Main swarm execution loop with singleton LLM client
+- graph: DAG construction, cycle breaking, topological tiers
+- orchestrator: Async parallel swarm loop with backend-agnostic LLM client
+- governance: Convergence detection, stalling, re-delegation
+- audit: JSONL event logging
+
+Sub-packages:
+- observability: Distributed tracing, metrics, profiling, failure analysis
+- safeguards: Rate limiter, token budget, circuit breaker
+- messaging: Typed agent message passing
+- routing: AsyncRoutingEngine with embed lock
+- delegation: Subtask delegation with depth/timeout control
 """
 
 from dytopo.models import (
@@ -47,6 +56,17 @@ from dytopo.governance import (
     update_agent_metrics,
 )
 from dytopo.audit import SwarmAuditLog
+from dytopo.safeguards import (
+    CircuitBreaker,
+    CircuitBreakerOpen,
+    PerformanceSafeguards,
+    RateLimiter,
+    TokenBudget,
+    TokenBudgetExceeded,
+)
+from dytopo.messaging import AgentMessage, MessageHistory, MessageRouter
+from dytopo.routing import AsyncRoutingEngine, RoutingResult
+from dytopo.delegation import DelegationError, DelegationManager, DelegationRecord
 
 __all__ = [
     # Models
@@ -80,4 +100,22 @@ __all__ = [
     "update_agent_metrics",
     # Audit
     "SwarmAuditLog",
+    # Safeguards
+    "CircuitBreaker",
+    "CircuitBreakerOpen",
+    "PerformanceSafeguards",
+    "RateLimiter",
+    "TokenBudget",
+    "TokenBudgetExceeded",
+    # Messaging
+    "AgentMessage",
+    "MessageHistory",
+    "MessageRouter",
+    # Routing (async)
+    "AsyncRoutingEngine",
+    "RoutingResult",
+    # Delegation
+    "DelegationError",
+    "DelegationManager",
+    "DelegationRecord",
 ]

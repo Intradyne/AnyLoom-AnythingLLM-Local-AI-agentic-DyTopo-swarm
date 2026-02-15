@@ -270,6 +270,101 @@ class TestMetrics:
         assert len(metrics.per_agent) == 0
 
 
+class TestTieredExecution:
+    """Test topological tier computation for parallel execution."""
+
+    def test_simple_dag_tiers(self):
+        """a→b, a→c, b→c should give tiers: [a], [b], [c]."""
+        from dytopo.graph import build_execution_graph, get_execution_tiers
+
+        edges = [("a", "b", 0.5), ("a", "c", 0.4), ("b", "c", 0.3)]
+        G = build_execution_graph(edges, ["a", "b", "c"])
+        tiers = get_execution_tiers(G, ["a", "b", "c"])
+
+        assert len(tiers) == 3, f"Expected 3 tiers, got {len(tiers)}: {tiers}"
+        assert tiers[0] == ["a"], f"Tier 0 should be ['a'], got {tiers[0]}"
+        assert tiers[1] == ["b"], f"Tier 1 should be ['b'], got {tiers[1]}"
+        assert tiers[2] == ["c"], f"Tier 2 should be ['c'], got {tiers[2]}"
+
+    def test_parallel_dag_tiers(self):
+        """a→c, b→c should give tiers: [a, b], [c]."""
+        from dytopo.graph import build_execution_graph, get_execution_tiers
+
+        edges = [("a", "c", 0.5), ("b", "c", 0.4)]
+        G = build_execution_graph(edges, ["a", "b", "c"])
+        tiers = get_execution_tiers(G, ["a", "b", "c"])
+
+        assert len(tiers) == 2, f"Expected 2 tiers, got {len(tiers)}: {tiers}"
+        assert sorted(tiers[0]) == ["a", "b"], f"Tier 0 should be ['a', 'b'], got {tiers[0]}"
+        assert tiers[1] == ["c"], f"Tier 1 should be ['c'], got {tiers[1]}"
+
+    def test_all_isolated_single_tier(self):
+        """No edges should give all agents in one tier."""
+        from dytopo.graph import build_execution_graph, get_execution_tiers
+
+        G = build_execution_graph([], ["a", "b", "c", "d"])
+        tiers = get_execution_tiers(G, ["a", "b", "c", "d"])
+
+        assert len(tiers) == 1, f"Expected 1 tier, got {len(tiers)}: {tiers}"
+        assert sorted(tiers[0]) == ["a", "b", "c", "d"]
+
+    def test_chain_graph_tiers(self):
+        """Linear chain a→b→c→d should give 4 tiers, one agent each."""
+        from dytopo.graph import build_execution_graph, get_execution_tiers
+
+        edges = [("a", "b", 0.5), ("b", "c", 0.4), ("c", "d", 0.3)]
+        G = build_execution_graph(edges, ["a", "b", "c", "d"])
+        tiers = get_execution_tiers(G, ["a", "b", "c", "d"])
+
+        assert len(tiers) == 4, f"Expected 4 tiers, got {len(tiers)}: {tiers}"
+        assert tiers[0] == ["a"]
+        assert tiers[1] == ["b"]
+        assert tiers[2] == ["c"]
+        assert tiers[3] == ["d"]
+
+    def test_cycle_is_broken_before_tiers(self):
+        """Graph with cycle should still produce valid tiers after cycle breaking."""
+        from dytopo.graph import build_execution_graph, get_execution_tiers
+
+        edges = [("a", "b", 0.5), ("b", "a", 0.3)]
+        G = build_execution_graph(edges, ["a", "b"])
+        tiers = get_execution_tiers(G, ["a", "b"])
+
+        # After breaking the weaker b→a edge, should have a→b: tiers [a], [b]
+        all_agents = {aid for tier in tiers for aid in tier}
+        assert all_agents == {"a", "b"}, f"All agents should appear, got {all_agents}"
+        assert len(tiers) >= 1
+
+
+class TestConcurrencyConfig:
+    """Test concurrency configuration."""
+
+    def test_default_backend_is_lmstudio(self):
+        """Default config should use lmstudio backend."""
+        from dytopo.config import _DEFAULTS
+
+        assert _DEFAULTS["concurrency"]["backend"] == "lmstudio"
+        assert _DEFAULTS["concurrency"]["max_concurrent"] == 1
+
+    def test_config_loads_concurrency_section(self):
+        """load_config should include concurrency section."""
+        from dytopo.config import load_config
+
+        config = load_config()
+        assert "concurrency" in config
+        assert "backend" in config["concurrency"]
+        assert "max_concurrent" in config["concurrency"]
+        assert "vllm_base_url" in config["concurrency"]
+
+    def test_vllm_defaults(self):
+        """vLLM defaults should be sensible."""
+        from dytopo.config import _DEFAULTS
+
+        assert _DEFAULTS["concurrency"]["vllm_base_url"] == "http://localhost:8000/v1"
+        assert _DEFAULTS["concurrency"]["connect_timeout"] == 10.0
+        assert _DEFAULTS["concurrency"]["read_timeout"] == 180.0
+
+
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  INTEGRATION TESTS — Requires LM Studio
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

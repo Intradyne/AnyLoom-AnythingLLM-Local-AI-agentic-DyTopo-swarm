@@ -1,5 +1,6 @@
 # Ignore Obsidian vault folders
 .obsidian/
+.obsidian/workspace.json
 .obsidian/*
 
 # Ignore Claude local files and caches

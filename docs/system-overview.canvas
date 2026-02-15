@@ -1,0 +1,41 @@
+{
+	"nodes":[
+		{"id":"anythingllm","type":"text","text":"## AnythingLLM\n\nUser interface + working memory\nText / Voice to Text / Voice\nBuilt-in web scraper (LLM + manual)\nAuto-loads Qdrant RAG (port 6333)\nWorkspaces: `c` (primary), `a` (parity)","x":-200,"y":-680,"width":340,"height":200,"color":"4"},
+		{"id":"lm_studio","type":"text","text":"## LM Studio\n\nModel control + MCP host\nQwen3-30B-A3B-Instruct-2507 (Q6_K)\nBGE-M3 Q8_0 GGUF (GPU, ~635 MB VRAM)\n/v1/embeddings → dense only → AnythingLLM\n/v1/chat/completions → agent inference","x":-200,"y":-400,"width":340,"height":260,"color":"4"},
+		{"id":"user_input","type":"text","text":"## User Input\n\nText or voice query\nObsidian notes, to-dos\nFile / web / automation requests","x":-160,"y":-960,"width":260,"height":160,"color":"1"},
+		{"id":"obsidian","type":"text","text":"## Obsidian\n\nPersonal knowledge base\nNotes, to-dos, project planning\nCanvas visualizations","x":280,"y":-960,"width":260,"height":160,"color":"6"},
+		{"id":"mcp_server","type":"text","text":"## MCP Server (qdrant-rag)\n\n`src/qdrant_mcp_server.py` (~1,030 lines)\nFastMCP, stdio JSON-RPC transport\n\n**RAG tools (5):** rag_search, rag_status,\nrag_reindex, rag_sources, rag_file_info\n\n**DyTopo tools (3):** swarm_start,\nswarm_status, swarm_result\n\nBGE-M3 FlagEmbedding on CPU (~2.3 GB)\nHybrid dense+sparse search with RRF","x":-200,"y":-55,"width":340,"height":365,"color":"4"},
+		{"id":"rag_sources","type":"text","text":"## RAG Document Sources\n\n**AnythingLLM → Qdrant 6333:**\n6 docs in `rag-docs/anythingllm/`\n\n**LM Studio → Qdrant 6334:**\n10 docs in `rag-docs/lm-studio/`\nHybrid dense+sparse indexing\nSHA-256 content-hash dedup\nsource_dir payload filtering","x":-1060,"y":-390,"width":360,"height":260,"color":"6"},
+		{"id":"qdrant_6334","type":"text","text":"## Qdrant — Port 6334\n\nLM Studio only (hybrid dense+sparse RAG)\nBAAI/bge-m3 via FlagEmbedding on CPU\nDense 1024-dim + sparse lexical (RRF fusion)\n~2.3 GB RAM, 0 VRAM\nHybrid search via qdrant_mcp_server.py\n\n`docker run -d --name lmstudio-qdrant -p 6334:6333 --memory=4g qdrant/qdrant`","x":-1060,"y":-15,"width":360,"height":285,"color":"5"},
+		{"id":"dytopo","type":"text","text":"## DyTopo Swarm\n\n`src/dytopo/` — 8 core modules + 5 sub-packages\nAsync parallel orchestration (asyncio.gather)\nSemaphore-controlled concurrency (LM Studio / vLLM)\nSemantic routing: MiniLM-L6-v2, cosine sim, threshold τ\nTopological tiers for parallel-within-tier execution\nDomains: code · math · general\n\nSee [swarm-overview.canvas](swarm-overview.canvas) for module details","x":-580,"y":310,"width":380,"height":370,"color":"3"},
+		{"id":"docker_mcp","type":"text","text":"## Docker MCP Gateway\n\nShared MCP infrastructure for\nAnythingLLM + LM Studio\n\n**Tools:**\n• Desktop Commander — shell, file ops, processes\n• Filesystem — read/write/list/move/delete\n• Memory — persistent knowledge graph\n• Context7 — always-current API docs\n• Tavily — web search (API credits)\n• Fetch — URL → clean markdown (free)\n• Playwright — browser automation\n• Sequential Thinking — structured reasoning\n\nQdrant is called directly by port, not through gateway","x":490,"y":-310,"width":385,"height":400,"color":"5"},
+		{"id":"n8n","type":"text","text":"## n8n Docker Container\n\nScheduled tasks\nComplex automation\nWorkflows\nn8n can call LLMs or other AI\nAlso has its own Docker MCP server","x":541,"y":220,"width":284,"height":240,"color":"5"},
+		{"id":"8a45810e2796ae10","x":902,"y":315,"width":116,"height":50,"type":"text","text":"api calls"},
+		{"id":"standalone","type":"text","text":"## Standalone Tools\n\nResponsive bots\nPython smart web scraper\n2D / video / 3D generation models","x":957,"y":-195,"width":243,"height":170,"color":"2"},
+		{"id":"mcp_config","type":"text","text":"## LM Studio mcp.json\n\n**JS Code Sandbox** — disabled\n**RAGv1 Embedder** — disabled\n\nServers:\n• MCP_DOCKER — docker mcp gateway run\n• qdrant-rag — python src/qdrant_mcp_server.py\n  env: QDRANT_URL, COLLECTION_NAME,\n  LMStudio_DOCS_DIR, AnythingLLM_DOCS_DIR","x":419,"y":-750,"width":406,"height":270,"color":"4"},
+		{"id":"qdrant_6333","type":"text","text":"## Qdrant — Port 6333\n\nAnythingLLM only (dense-only RAG)\nBGE-M3 Q8_0 GGUF via LM Studio /v1/embeddings\nDense 1024-dim vectors\nWorkspace documents + webscrape results\n\n`docker run -d --name anythingllm-qdrant -p 6333:6333 --memory=4g qdrant/qdrant`","x":-1060,"y":-715,"width":360,"height":270,"color":"5"}
+	],
+	"edges":[
+		{"id":"e1","fromNode":"user_input","fromSide":"bottom","toNode":"anythingllm","toSide":"top","color":"1","label":"chat / query"},
+		{"id":"e2","fromNode":"user_input","fromSide":"right","toNode":"obsidian","toSide":"left","color":"1","label":"notes"},
+		{"id":"e3","fromNode":"anythingllm","fromSide":"bottom","toNode":"lm_studio","toSide":"top","color":"4","label":"LLM inference"},
+		{"id":"e4","fromNode":"anythingllm","fromSide":"left","toNode":"qdrant_6333","toSide":"right","color":"4","label":"dense RAG"},
+		{"id":"e5","fromNode":"lm_studio","fromSide":"bottom","toNode":"mcp_server","toSide":"top","color":"4","label":"MCP tools"},
+		{"id":"e7","fromNode":"lm_studio","fromSide":"left","toNode":"qdrant_6334","toSide":"right","color":"4","label":"hybrid RAG"},
+		{"id":"e8","fromNode":"mcp_server","fromSide":"left","toNode":"qdrant_6334","toSide":"right","color":"5","label":"search"},
+		{"id":"e9","fromNode":"mcp_server","fromSide":"bottom","toNode":"dytopo","toSide":"right","color":"3","label":"swarm tasks"},
+		{"id":"e11","fromNode":"rag_sources","fromSide":"bottom","toNode":"qdrant_6334","toSide":"top","color":"6"},
+		{"id":"e12","fromNode":"docker_mcp","fromSide":"right","toNode":"standalone","toSide":"left"},
+		{"id":"e13","fromNode":"docker_mcp","fromSide":"bottom","toNode":"n8n","toSide":"top","color":"5"},
+		{"id":"e14","fromNode":"lm_studio","fromSide":"right","toNode":"mcp_config","toSide":"bottom","color":"4","label":"config"},
+		{"id":"e15","fromNode":"obsidian","fromSide":"bottom","toNode":"anythingllm","toSide":"right","color":"6","label":"context"},
+		{"id":"e16","fromNode":"dytopo","fromSide":"top","toNode":"lm_studio","toSide":"left","color":"3","label":"LLM calls"},
+		{"id":"b1352f454ef94003","fromNode":"n8n","fromSide":"left","toNode":"anythingllm","toSide":"right","color":"1","label":"chat/querry"},
+		{"id":"ff8262542ace6b7a","fromNode":"n8n","fromSide":"left","toNode":"lm_studio","toSide":"right","color":"1","label":"chat/querry"},
+		{"id":"36d3a83a99ed569e","fromNode":"lm_studio","fromSide":"right","toNode":"docker_mcp","toSide":"left","color":"4"},
+		{"id":"64afbf18c77e4be9","fromNode":"rag_sources","fromSide":"top","toNode":"qdrant_6333","toSide":"bottom","color":"6"},
+		{"id":"35c1b2400e8af29d","fromNode":"n8n","fromSide":"right","toNode":"8a45810e2796ae10","toSide":"left"},
+		{"id":"79a5b601d269adb7","fromNode":"8a45810e2796ae10","fromSide":"left","toNode":"n8n","toSide":"right"},
+		{"id":"9166f6f1838afc97","fromNode":"n8n","fromSide":"right","toNode":"standalone","toSide":"left"}
+	]
+}

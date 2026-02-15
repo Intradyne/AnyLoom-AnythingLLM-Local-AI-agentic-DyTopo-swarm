@@ -10,6 +10,8 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -60,6 +62,7 @@ async def mock_invalid_json_agent():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 
+@pytest.mark.asyncio
 async def test_execute_agent_safe_success():
     """Test successful agent execution."""
     print("\n[TEST] execute_agent_safe with successful agent")
@@ -71,6 +74,7 @@ async def test_execute_agent_safe_success():
     print("[PASS] Successful agent execution works")
 
 
+@pytest.mark.asyncio
 async def test_execute_agent_safe_timeout():
     """Test timeout handling."""
     print("\n[TEST] execute_agent_safe with timeout")
@@ -83,6 +87,7 @@ async def test_execute_agent_safe_timeout():
     print("[PASS] Timeout handling works")
 
 
+@pytest.mark.asyncio
 async def test_execute_agent_safe_failure():
     """Test exception handling."""
     print("\n[TEST] execute_agent_safe with failing agent")
@@ -94,6 +99,7 @@ async def test_execute_agent_safe_failure():
     print("[PASS] Exception handling works")
 
 
+@pytest.mark.asyncio
 async def test_execute_agent_safe_invalid_json():
     """Test invalid JSON handling."""
     print("\n[TEST] execute_agent_safe with invalid JSON")

@@ -2,12 +2,14 @@
 DyTopo Orchestrator
 ===================
 
-Main swarm execution loop with dynamic semantic routing.
+Main swarm execution loop with dynamic semantic routing and parallel execution.
 
 Architecture:
-- Lazy singleton AsyncOpenAI client (never closed between calls)
-- Round 1: Broadcast (all agents see all outputs, no routing)
-- Rounds 2+: Phase A (descriptors) -> Phase B (routing graph) -> Phase C (execute in topo order)
+- Lazy singleton AsyncOpenAI client (backend-agnostic: LM Studio or vLLM)
+- Semaphore-controlled concurrency (max_concurrent=1 for LM Studio, 8 for vLLM)
+- Round 1: Broadcast (all agents execute in parallel via asyncio.gather)
+- Rounds 2+: Phase A (parallel descriptor generation) -> Phase B (routing graph)
+             -> Phase C (tiered parallel execution via topological_generations)
 """
 
 from __future__ import annotations
@@ -39,7 +41,7 @@ from dytopo.agents import (
     get_system_prompt,
 )
 from dytopo.router import build_routing_result, log_routing_round
-from dytopo.graph import build_execution_graph, get_execution_order, get_incoming_agents
+from dytopo.graph import build_execution_graph, get_execution_order, get_execution_tiers, get_incoming_agents
 from dytopo.governance import (
     detect_convergence,
     recommend_redelegation,
@@ -51,20 +53,49 @@ logger = logging.getLogger("dytopo.orchestrator")
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#  Lazy singleton AsyncOpenAI client
+#  Lazy singleton AsyncOpenAI client + inference semaphore
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 _llm_client = None
+_inference_semaphore: asyncio.Semaphore | None = None
 
 
-def _get_llm_client(base_url: str = "http://localhost:1234/v1"):
-    """Lazy singleton — one client reused across all calls."""
+def _get_llm_client(config: dict | None = None):
+    """Lazy singleton — one client reused across all calls.
+
+    Backend-aware: selects base_url from config["concurrency"]["backend"].
+    - "lmstudio": uses config["llm"]["base_url"] (default localhost:1234)
+    - "vllm": uses config["concurrency"]["vllm_base_url"] (default localhost:8000)
+    """
     global _llm_client
     if _llm_client is None:
         from openai import AsyncOpenAI
-        _llm_client = AsyncOpenAI(base_url=base_url, api_key="not-needed")
-        logger.info(f"AsyncOpenAI client initialized: {base_url}")
+        cfg = config or load_config()
+        backend = cfg.get("concurrency", {}).get("backend", "lmstudio")
+        if backend == "vllm":
+            base_url = cfg["concurrency"]["vllm_base_url"]
+            api_key = "EMPTY"
+        else:
+            base_url = cfg["llm"]["base_url"]
+            api_key = "not-needed"
+        _llm_client = AsyncOpenAI(base_url=base_url, api_key=api_key)
+        logger.info(f"AsyncOpenAI client initialized: {base_url} (backend={backend})")
     return _llm_client
+
+
+def _get_semaphore(config: dict | None = None) -> asyncio.Semaphore:
+    """Lazy singleton semaphore controlling max concurrent LLM calls.
+
+    With lmstudio (max_concurrent=1), calls are effectively sequential.
+    With vllm (max_concurrent=8), up to 8 calls run in parallel.
+    """
+    global _inference_semaphore
+    if _inference_semaphore is None:
+        cfg = config or load_config()
+        max_concurrent = cfg.get("concurrency", {}).get("max_concurrent", 1)
+        _inference_semaphore = asyncio.Semaphore(max_concurrent)
+        logger.info(f"Inference semaphore initialized: max_concurrent={max_concurrent}")
+    return _inference_semaphore
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -168,8 +199,9 @@ async def _llm_call(
     from openai import APITimeoutError
 
     cfg = config or load_config()
-    client = _get_llm_client(cfg["llm"]["base_url"])
+    client = _get_llm_client(cfg)
     timeout_sec = cfg["llm"]["timeout_seconds"]
+    semaphore = _get_semaphore(cfg)
 
     kwargs: dict[str, Any] = {
         "model": cfg["llm"]["model"],
@@ -191,10 +223,11 @@ async def _llm_call(
         ) if retry_state.outcome and retry_state.outcome.exception() else False,
     )
     async def _call():
-        return await asyncio.wait_for(
-            client.chat.completions.create(**kwargs),
-            timeout=timeout_sec,
-        )
+        async with semaphore:
+            return await asyncio.wait_for(
+                client.chat.completions.create(**kwargs),
+                timeout=timeout_sec,
+            )
 
     resp = await _call()
 
@@ -507,24 +540,34 @@ async def run_swarm(
             swarm.progress_message = f"Round {t}/{swarm.T_max}: {round_goal[:60]}..."
             await progress("manager_goal", {"round": t, "goal": round_goal})
 
-            # ── Round 1: BROADCAST (no routing, combined call) ───────────────
+            # ── Round 1: BROADCAST (no routing, parallel calls) ───────────────
             if t == 1 and config["routing"]["broadcast_round_1"]:
-                for agent_id, agent_state in agent_map.items():
-                    await progress("agent_working", {"agent": agent_id, "round": t, "mode": "broadcast"})
+                await progress("phase_broadcast", {"round": t, "agents": list(agent_map.keys())})
 
-                    descriptor, tokens = await _call_worker(
-                        agent_state, round_goal, swarm.task,
-                        incoming_messages=[],  # no messages in round 1
+                async def _broadcast_agent(aid: str, astate: AgentState):
+                    desc, tok = await _call_worker(
+                        astate, round_goal, swarm.task,
+                        incoming_messages=[],
                         domain=swarm.domain,
                         config=config,
                     )
+                    return aid, astate, desc, tok
+
+                broadcast_results = await asyncio.gather(
+                    *[_broadcast_agent(aid, ast) for aid, ast in agent_map.items()],
+                    return_exceptions=True,
+                )
+
+                for result in broadcast_results:
+                    if isinstance(result, Exception):
+                        logger.error(f"Round 1 broadcast agent failed: {result}")
+                        continue
+                    agent_id, agent_state, descriptor, tokens = result
                     agent_state.descriptor = descriptor
                     agent_state.history.append(descriptor.model_dump())
                     round_record.agent_outputs[agent_id] = descriptor
                     swarm.total_llm_calls += 1
                     swarm.total_tokens += tokens
-
-                    await progress("agent_done", {"agent": agent_id, "round": t})
 
                 round_record.execution_order = list(agent_map.keys())
                 round_record.duration_sec = time.monotonic() - round_start
@@ -542,17 +585,30 @@ async def run_swarm(
 
             # ── Rounds 2+: TWO-PHASE SPLIT ──────────────────────────────────
 
-            # Phase A: Descriptor-only calls (fast, /no_think, temp 0.1)
+            # Phase A: Descriptor-only calls (parallel, /no_think, temp 0.1)
             await progress("phase_descriptors", {"round": t})
-            descriptors: dict[str, dict] = {}
-            for agent_id, agent_state in agent_map.items():
-                desc, tokens = await _call_worker(
-                    agent_state, round_goal, swarm.task,
+
+            async def _gen_descriptor(aid: str, astate: AgentState):
+                desc, tok = await _call_worker(
+                    astate, round_goal, swarm.task,
                     incoming_messages=[],
                     domain=swarm.domain,
                     config=config,
                     descriptor_only=True,
                 )
+                return aid, astate, desc, tok
+
+            desc_results = await asyncio.gather(
+                *[_gen_descriptor(aid, ast) for aid, ast in agent_map.items()],
+                return_exceptions=True,
+            )
+
+            descriptors: dict[str, dict] = {}
+            for result in desc_results:
+                if isinstance(result, Exception):
+                    logger.error(f"Descriptor generation failed: {result}")
+                    continue
+                agent_id, agent_state, desc, tokens = result
                 swarm.total_llm_calls += 1
                 swarm.total_tokens += tokens
                 descriptors[agent_id] = {
@@ -595,36 +651,54 @@ async def run_swarm(
                 "execution_order": execution_order,
             })
 
-            # Phase C: Execute agents in topological order with routed messages
+            # Phase C: Execute agents in topological tiers (parallel within tier)
             round_outputs: dict[str, AgentDescriptor] = {}
-            for agent_id in execution_order:
-                agent_state = agent_map[agent_id]
-                await progress("agent_working", {"agent": agent_id, "round": t, "mode": "routed"})
+            tiers = get_execution_tiers(
+                routing_graph if routing_graph is not None else G,
+                list(agent_map.keys()),
+            )
 
-                # Collect incoming messages
-                if routing_graph is not None:
-                    incoming = _gather_routed(routing_graph, round_outputs, agent_id, agent_map)
-                else:
-                    incoming = []
+            for tier_idx, tier in enumerate(tiers):
+                await progress("tier_start", {"round": t, "tier": tier_idx, "agents": tier})
 
-                # Cold start mitigation: inject round 1 outputs if round 2 and no edges
-                if not incoming and t == 2 and swarm.rounds:
-                    incoming = _gather_broadcast(swarm.rounds, agent_id)
+                async def _exec_agent(aid: str):
+                    astate = agent_map[aid]
+                    # Collect incoming messages from prior tiers' outputs
+                    if routing_graph is not None:
+                        incoming = _gather_routed(routing_graph, round_outputs, aid, agent_map)
+                    else:
+                        incoming = []
+                    # Cold start mitigation: inject round 1 outputs if round 2 and no edges
+                    if not incoming and t == 2 and swarm.rounds:
+                        incoming = _gather_broadcast(swarm.rounds, aid)
 
-                descriptor, tokens = await _call_worker(
-                    agent_state, round_goal, swarm.task,
-                    incoming_messages=incoming,
-                    domain=swarm.domain,
-                    config=config,
+                    descriptor, tokens = await _call_worker(
+                        astate, round_goal, swarm.task,
+                        incoming_messages=incoming,
+                        domain=swarm.domain,
+                        config=config,
+                    )
+                    return aid, astate, descriptor, tokens
+
+                tier_results = await asyncio.gather(
+                    *[_exec_agent(aid) for aid in tier],
+                    return_exceptions=True,
                 )
-                agent_state.descriptor = descriptor
-                agent_state.history.append(descriptor.model_dump())
-                round_outputs[agent_id] = descriptor
-                round_record.agent_outputs[agent_id] = descriptor
-                swarm.total_llm_calls += 1
-                swarm.total_tokens += tokens
 
-                await progress("agent_done", {"agent": agent_id, "round": t, "incoming_count": len(incoming)})
+                # Accumulate outputs — all agents in this tier complete before next tier
+                for result in tier_results:
+                    if isinstance(result, Exception):
+                        logger.error(f"Agent execution failed in tier {tier_idx}: {result}")
+                        continue
+                    agent_id, agent_state, descriptor, tokens = result
+                    agent_state.descriptor = descriptor
+                    agent_state.history.append(descriptor.model_dump())
+                    round_outputs[agent_id] = descriptor
+                    round_record.agent_outputs[agent_id] = descriptor
+                    swarm.total_llm_calls += 1
+                    swarm.total_tokens += tokens
+
+                await progress("tier_done", {"round": t, "tier": tier_idx, "agents": tier})
 
             round_record.duration_sec = time.monotonic() - round_start
             swarm.rounds.append(round_record)

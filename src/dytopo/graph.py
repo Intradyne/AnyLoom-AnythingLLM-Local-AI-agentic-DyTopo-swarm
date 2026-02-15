@@ -116,6 +116,47 @@ def get_execution_order(G: nx.DiGraph, agent_ids: list[str]) -> list[str]:
         return agent_ids
 
 
+def get_execution_tiers(G: nx.DiGraph, agent_ids: list[str]) -> list[list[str]]:
+    """Compute topological tiers for parallel execution.
+
+    Agents in the same tier have no dependencies on each other and can
+    execute concurrently.  Tiers are ordered: tier 0 has no incoming edges,
+    tier 1 depends only on tier 0, etc.
+
+    Falls back to all agents in a single tier if the graph has no edges
+    (broadcast mode) or if tier computation fails.
+
+    Args:
+        G: Directed graph (cycles are broken first via break_cycles)
+        agent_ids: All agent IDs (ensures isolated agents appear)
+
+    Returns:
+        List of tiers, each tier is a list of agent IDs.
+    """
+    # Break cycles first to guarantee a DAG
+    removed = break_cycles(G)
+    if removed:
+        logger.info(f"Removed {len(removed)} edges before tier computation")
+
+    if G.number_of_edges() == 0:
+        # No routing edges — all agents in one tier (broadcast equivalent)
+        return [sorted(agent_ids)]
+
+    try:
+        tiers = [sorted(gen) for gen in nx.topological_generations(G)]
+
+        # Ensure all agent_ids appear (isolated agents may be missing)
+        seen = {aid for tier in tiers for aid in tier}
+        missing = [aid for aid in agent_ids if aid not in seen]
+        if missing:
+            tiers.append(sorted(missing))
+
+        return tiers
+    except Exception as e:
+        logger.warning(f"Tier computation failed: {e}. Falling back to single tier.")
+        return [sorted(agent_ids)]
+
+
 def get_incoming_agents(G: nx.DiGraph, target_id: str) -> list[str]:
     """Return list of agent IDs that have edges pointing TO target_id.
 
