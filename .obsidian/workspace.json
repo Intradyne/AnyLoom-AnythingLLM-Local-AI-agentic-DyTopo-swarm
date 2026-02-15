@@ -11,17 +11,14 @@
             "id": "1c850e238634fa58",
             "type": "leaf",
             "state": {
-              "type": "canvas",
+              "type": "markdown",
               "state": {
-                "file": "docs/system-overview.canvas",
-                "viewState": {
-                  "x": 74.09689629068885,
-                  "y": -85.37471612414834,
-                  "zoom": -0.44956887200855344
-                }
+                "file": "docs/OBSERVABILITY-DELIVERABLE.md",
+                "mode": "source",
+                "source": false
               },
-              "icon": "lucide-layout-dashboard",
-              "title": "system-overview"
+              "icon": "lucide-file",
+              "title": "OBSERVABILITY-DELIVERABLE"
             }
           }
         ]
@@ -185,13 +182,14 @@
   },
   "active": "1c850e238634fa58",
   "lastOpenFiles": [
+    "docs/qwen3-model.md",
+    "docs/swarm-overview.canvas",
+    "docs/system-overview.canvas",
     "README.md",
     "example.png",
     "docs/OBSERVABILITY-DELIVERABLE.md",
-    "docs/system-overview.canvas",
     "test_trace.json",
     "test_metrics.prom",
-    "docs/swarm-overview.canvas",
     "docs/OBSERVABILITY.md",
     "README.md.tmp.220876.1771192960946",
     "scripts/benchmarks/benchmark-v2.md",
