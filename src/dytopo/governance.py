@@ -27,6 +27,15 @@ from typing import Any
 logger = logging.getLogger("dytopo.governance")
 
 
+def _get_work(output: Any) -> str:
+    """Extract 'work' from a dict or Pydantic AgentDescriptor."""
+    if hasattr(output, "work"):
+        return output.work or ""
+    if isinstance(output, dict):
+        return output.get("work", "")
+    return ""
+
+
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  FAILURE-SAFE AGENT EXECUTION
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -235,9 +244,9 @@ def detect_convergence(
         round_b = recent_rounds[i + 1].get("outputs", {})
 
         for agent_id in agent_ids:
-            # Get work products from both rounds
-            work_a = round_a.get(agent_id, {}).get("work", "")
-            work_b = round_b.get(agent_id, {}).get("work", "")
+            # Get work products from both rounds (handles dict or Pydantic)
+            work_a = _get_work(round_a.get(agent_id, {}))
+            work_b = _get_work(round_b.get(agent_id, {}))
 
             # Skip if either is empty
             if not work_a or not work_b:
@@ -324,7 +333,7 @@ def detect_stalling(
     for rh in recent_rounds:
         outputs = rh.get("outputs", {})
         if agent_id in outputs:
-            work = outputs[agent_id].get("work", "")
+            work = _get_work(outputs[agent_id])
             if work:
                 work_products.append(work)
 
@@ -396,7 +405,8 @@ def recommend_redelegation(
     for rh in round_history:
         outputs = rh.get("outputs", {})
         for aid, output in outputs.items():
-            if not output.get("success", True):
+            success = output.get("success", True) if isinstance(output, dict) else getattr(output, "success", True)
+            if not success:
                 failure_counts[aid] += 1
 
     # Check each agent

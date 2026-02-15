@@ -31,7 +31,7 @@ class SwarmAuditLog:
             base_dir: Base directory for logs (defaults to ~/dytopo-logs)
         """
         self.task_id = task_id
-        self.base_dir = base_dir or Path.home() / "dytopo-logs"
+        self.base_dir = Path(base_dir).expanduser() if base_dir else Path.home() / "dytopo-logs"
         self.log_dir = self.base_dir / task_id
 
         # Create directories if they don't exist

@@ -15,9 +15,9 @@
               "state": {
                 "file": "Overview-Obsidaian.canvas",
                 "viewState": {
-                  "x": -1260.398964534473,
-                  "y": -3168.5319582768793,
-                  "zoom": -0.6666666666666665
+                  "x": 3005.692588323317,
+                  "y": -1058.6080999000574,
+                  "zoom": -1
                 }
               },
               "icon": "lucide-layout-dashboard",
@@ -185,17 +185,17 @@
   },
   "active": "1c850e238634fa58",
   "lastOpenFiles": [
+    "files.zip",
+    "src/dytopo/__pycache__/audit.cpython-314.pyc",
+    "src/dytopo/__pycache__/governance.cpython-314.pyc",
+    "tests/__pycache__/conftest.cpython-314-pytest-9.0.2.pyc",
+    "tests/conftest.py",
+    "tests/__pycache__/test_dytopo.cpython-314-pytest-9.0.2.pyc",
+    "tests/__pycache__/test_dytopo.cpython-314.pyc",
+    "tests/__pycache__",
     "LICENSE.txt",
     "New Rich Text Document.rtf",
     "tests/test_dytopo.py",
-    "fix_indent.py",
-    "src/dytopo/audit.py",
-    "src/dytopo/governance.py",
-    "src/dytopo/__pycache__/graph.cpython-314.pyc",
-    "src/dytopo/__pycache__/router.cpython-314.pyc",
-    "src/dytopo/__pycache__/orchestrator.cpython-314.pyc",
-    "src/dytopo/__pycache__/agents.cpython-314.pyc",
-    "src/dytopo/__pycache__/config.cpython-314.pyc",
     "dytopo/GOVERNANCE_SUMMARY.md",
     "dytopo/INTEGRATION_EXAMPLE.md",
     "dytopo/README.md",

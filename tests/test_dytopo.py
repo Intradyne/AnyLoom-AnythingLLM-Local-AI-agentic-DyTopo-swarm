@@ -86,10 +86,10 @@ class TestRoutingMath:
         A = (S >= 0.3).astype(np.int32)
         A_capped, removed = enforce_max_indegree(A, S, K_in=2)
 
-        # Check indegree constraint
-        for col_idx in range(5):
-            indegree = A_capped[:, col_idx].sum()
-            assert indegree <= 2, f"Column {col_idx} has indegree {indegree} > 2"
+        # Check indegree constraint (row sums: A[i][j]=1 means j→i)
+        for row_idx in range(5):
+            indegree = A_capped[row_idx, :].sum()
+            assert indegree <= 2, f"Agent {row_idx} has indegree {indegree} > 2"
 
     def test_edge_direction_convention(self):
         """Verify A[i][j] = 1 means j → i (j sends to i)."""
