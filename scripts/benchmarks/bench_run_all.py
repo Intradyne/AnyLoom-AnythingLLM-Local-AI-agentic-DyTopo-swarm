@@ -8,9 +8,9 @@ Usage:
 Default execution order (matches GPU contention constraints):
     Pair 1: Phase 1 + Phase 2  (both workspace c, independent queries)
     Pair 2: Phase 3 + Phase 4  (workspace a + workspace c, independent)
-    Pair 3: Phase 5 + Phase 6  (LM Studio direct + workspace c showcase)
+    Pair 3: Phase 5 + Phase 6  (LLM direct + workspace c showcase)
 
-Phase 5 hits LM Studio directly (competes for GPU with AnythingLLM queries),
+Phase 5 hits llama.cpp directly (competes for GPU with AnythingLLM queries),
 but in practice the 3-second sleep between queries avoids contention.
 """
 import subprocess, sys, os, time, argparse
@@ -20,7 +20,7 @@ SCRIPTS = {
     2: "bench_phase2_adversarial.py",
     3: "bench_phase3_workspace.py",
     4: "bench_phase4_stability.py",
-    5: "bench_phase5_lmstudio.py",
+    5: "bench_phase5_llm.py",
     6: "bench_phase6_showcase.py",
 }
 

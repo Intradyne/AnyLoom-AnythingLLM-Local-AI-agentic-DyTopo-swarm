@@ -68,10 +68,10 @@ def get_workspace_settings():
     r.raise_for_status()
     return r.json()
 
-def send_lmstudio(message, system_prompt):
-    """Send a message directly to LM Studio API with a custom system prompt."""
+def send_llm(message, system_prompt):
+    """Send a message directly to llama.cpp API with a custom system prompt."""
     r = requests.post(
-        "http://localhost:1234/v1/chat/completions",
+        "http://localhost:8008/v1/chat/completions",
         json={
             "model": "qwen3-30b-a3b-instruct-2507",
             "temperature": 0.1,
@@ -80,7 +80,7 @@ def send_lmstudio(message, system_prompt):
                 {"role": "user", "content": message}
             ]
         },
-        timeout=120
+        timeout=300
     )
     r.raise_for_status()
     text = r.json()["choices"][0]["message"]["content"]

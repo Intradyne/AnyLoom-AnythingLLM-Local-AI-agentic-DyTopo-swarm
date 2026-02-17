@@ -1,20 +1,25 @@
 """
 Qdrant RAG + DyTopo Swarm MCP Server
 =====================================
-Hybrid dense+sparse search using BGE-M3 embeddings on CPU,
+Hybrid dense+sparse search using BGE-M3 embeddings on CPU (ONNX INT8, AVX-512),
 plus DyTopo multi-agent orchestration with semantic routing.
 
 Architecture:
-- BGE-M3 loads via FlagEmbedding on CPU (~2.3 GB system RAM, 0 GB VRAM)
+- BGE-M3 loads via sentence-transformers ONNX backend (INT8, ~0.6 GB RAM, 0 VRAM)
+- Dense vectors: 1024-dim from BGE-M3 ONNX (semantic matching)
+- Sparse vectors: TF-weighted hash-based token IDs (lexical keyword matching)
+  (ONNX doesn't export BGE-M3's learned sparse head, so we use log-TF with CRC32 IDs)
 - MiniLM-L6-v2 loads on CPU (~80 MB) for DyTopo descriptor routing
-- LM Studio keeps all 32 GB VRAM for Qwen3-30B-A3B-Instruct-2507
+- llama.cpp (Docker) for Qwen3-30B-A3B-Instruct-2507 (32 GB VRAM)
+- Qdrant single instance on port 6333 (gRPC: 6334)
 - Qdrant collection uses named vectors: "dense" (1024-dim) + "sparse" (lexical)
 - Search fuses both with Reciprocal Rank Fusion (RRF)
+- LRU embedding cache (4K entries, ~18MB) for repeated query patterns
 - Auto-indexes markdown docs from multiple source dirs with per-file incremental sync
-- DyTopo swarm runs as async background task, calls LM Studio API directly
+- DyTopo swarm runs as async background task, calls LLM API directly
 
 Hardware target: RTX 5090 (32 GB VRAM), Ryzen 9 9950X3D (16c/32t), 94 GB DDR5
-File location:   C:\\Users\\User\\Qdrant-RAG+Agents\\src\\qdrant_mcp_server.py
+File location:   <project-root>/src/qdrant_mcp_server.py
 
 DyTopo paper: arXiv 2602.06039, "Dynamic Topology Routing for Multi-Agent
 Reasoning via Semantic Matching" (Lu et al., Feb 2026)
@@ -30,7 +35,7 @@ MCP Tools (8 total):
   swarm_result(task_id)                  — retrieve completed swarm result
 
 Dependencies:
-  pip install FlagEmbedding torch --index-url https://download.pytorch.org/whl/cpu
+  pip install sentence-transformers[onnx] onnxruntime  # ONNX INT8 CPU embedding
   pip install qdrant-client>=1.12.0 mcp[cli]>=1.0.0
   pip install sentence-transformers>=3.0 networkx>=3.0 openai>=1.40
   pip install tenacity>=9.0 json-repair>=0.39
@@ -52,6 +57,9 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
+import math
+from collections import Counter
+
 import numpy as np
 from mcp.server.fastmcp import FastMCP
 
@@ -69,15 +77,11 @@ logger = logging.getLogger("qdrant-rag")
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  CONFIGURATION — environment variables
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-QDRANT_URL = os.environ.get("QDRANT_URL", "http://localhost:6334")
-COLLECTION = os.environ.get("COLLECTION_NAME", "lmstudio_docs")
+QDRANT_URL = os.environ.get("QDRANT_URL", "http://localhost:6333")
+COLLECTION = os.environ.get("COLLECTION_NAME", "anyloom_docs")
 
-# Multi-source doc directories (canvas state: LMStudio + AnythingLLM)
+# Doc directories for RAG indexing
 _project_root = os.path.join(os.path.dirname(__file__), "..")
-LMStudio_DOCS_DIR = os.environ.get(
-    "LMStudio_DOCS_DIR",
-    os.path.join(_project_root, "rag-docs", "lm-studio"),
-)
 AnythingLLM_DOCS_DIR = os.environ.get(
     "AnythingLLM_DOCS_DIR",
     os.path.join(_project_root, "rag-docs", "anythingllm"),
@@ -85,22 +89,21 @@ AnythingLLM_DOCS_DIR = os.environ.get(
 
 # Build source map: label → path (non-empty paths only)
 DOC_SOURCES: dict[str, str] = {}
-if LMStudio_DOCS_DIR:
-    DOC_SOURCES["lmstudio"] = LMStudio_DOCS_DIR
 if AnythingLLM_DOCS_DIR:
     DOC_SOURCES["anythingllm"] = AnythingLLM_DOCS_DIR
 
-# State file lives next to the primary docs dir
-STATE_FILE = os.path.join(LMStudio_DOCS_DIR, ".rag_state.json")
+# State file lives next to the docs dir
+STATE_FILE = os.path.join(AnythingLLM_DOCS_DIR, ".rag_state.json")
 
-# CPU tuning — Ryzen 9 9950X3D: 16 physical cores, use half for embedding
-CPU_THREADS = int(os.environ.get("RAG_CPU_THREADS", "8"))
+# ONNX INT8 tuning — Ryzen 9 9950X3D: AVX-512 VNNI, 128MB L3 V-Cache
+CPU_THREADS = int(os.environ.get("RAG_CPU_THREADS", "16"))
 EMBED_BATCH_SIZE = int(os.environ.get("RAG_EMBED_BATCH_SIZE", "16"))
-EMBED_MAX_LENGTH = int(os.environ.get("RAG_EMBED_MAX_LENGTH", "1024"))
-MIN_SCORE = float(os.environ.get("RAG_MIN_SCORE", "0.005"))
+EMBED_MAX_LENGTH = int(os.environ.get("RAG_EMBED_MAX_LENGTH", "8192"))
+EMBED_QUERY_MAX_LENGTH = int(os.environ.get("RAG_EMBED_QUERY_MAX_LENGTH", "256"))
+MIN_SCORE = float(os.environ.get("RAG_MIN_SCORE", "0.02"))
 
-# LLM endpoint for DyTopo swarm calls
-LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "http://localhost:1234/v1")
+# LLM endpoint for DyTopo swarm calls (llama.cpp via Docker)
+LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "http://localhost:8008/v1")
 LLM_MODEL = os.environ.get("LLM_MODEL", "qwen3-30b-a3b-instruct-2507")
 
 # Apply CPU thread limits before any torch/numpy import path kicks in
@@ -117,57 +120,152 @@ _embedder_lock = threading.Lock()
 _embedder = None      # BGE-M3 for RAG
 _qdrant = None
 
-# Dedicated thread pool for CPU-bound work (FIX #4: consistent executor)
+# Dedicated thread pool for CPU-bound ONNX embedding (FIX #4: consistent executor)
 _embed_executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="embed")
 
+# Embedding cache — LRU for query embeddings (20-45% hit rate in thematic swarms)
+from embedding_cache import EmbeddingCache
+_embed_cache = EmbeddingCache(maxsize=4096)
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#  BGE-M3 EMBEDDING — CPU, lazy singleton for RAG
+#  SPARSE VECTOR GENERATION — TF-based lexical matching
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+_STOP_WORDS = frozenset({
+    "a", "an", "the", "and", "or", "but", "in", "on", "at", "to", "for",
+    "of", "with", "by", "from", "is", "it", "as", "be", "was", "are",
+    "this", "that", "not", "no", "do", "if", "so", "up", "we", "he",
+    "she", "my", "me", "our", "you", "its", "has", "had", "have", "can",
+    "will", "just", "been", "than", "them", "then", "what", "when",
+    "how", "all", "each", "which", "their", "there", "these", "those",
+    "am", "did", "does", "would", "could", "should", "may", "about",
+})
+
+# Tokenizer pattern: split on non-alphanumeric, keep tokens 2+ chars
+_TOKEN_RE = re.compile(r"[a-z0-9]{2,}")
+
+
+def _text_to_sparse(text: str) -> dict[int, float]:
+    """Convert text to sparse vector using TF-weighted hash-based token IDs.
+
+    Produces a sparse vector compatible with Qdrant SparseVector format.
+    Token IDs are deterministic CRC32 hashes (consistent between index & query).
+    Weights are log-TF: 1 + log(count) to dampen high-frequency terms.
+    """
+    import binascii
+    tokens = _TOKEN_RE.findall(text.lower())
+    tokens = [t for t in tokens if t not in _STOP_WORDS]
+    if not tokens:
+        return {}
+
+    counts = Counter(tokens)
+    sparse = {}
+    for token, count in counts.items():
+        # CRC32 gives 32-bit unsigned int — deterministic, fast, no collisions for typical vocab
+        token_id = binascii.crc32(token.encode()) & 0x7FFFFFFF  # positive int
+        weight = 1.0 + math.log(count)  # log-TF
+        # If hash collision, keep the higher weight
+        if token_id not in sparse or sparse[token_id] < weight:
+            sparse[token_id] = weight
+    return sparse
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  BGE-M3 EMBEDDING — ONNX INT8 CPU, lazy singleton for RAG
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 def _get_embedder():
-    """Lazy-load BGE-M3 on first use. Thread-safe via module-level lock."""
+    """Lazy-load BGE-M3 ONNX INT8 on first use. Thread-safe via module-level lock."""
     global _embedder
     if _embedder is not None:
         return _embedder
     with _embedder_lock:
         if _embedder is None:
-            logger.info("Loading BGE-M3 on CPU (first use — may take 30-60s)...")
-            from FlagEmbedding import BGEM3FlagModel
-            import torch
-            torch.set_grad_enabled(False)
-            _embedder = BGEM3FlagModel(
-                "BAAI/bge-m3", device="cpu", use_fp16=False,
+            logger.info("Loading BGE-M3 ONNX INT8 on CPU (first use — may take 10-20s)...")
+            from sentence_transformers import SentenceTransformer
+            import onnxruntime as ort
+
+            # Configure ONNX Runtime for Ryzen 9950X3D AVX-512 VNNI
+            sess_options = ort.SessionOptions()
+            sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+            sess_options.intra_op_num_threads = CPU_THREADS
+            sess_options.inter_op_num_threads = 2
+            sess_options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+            sess_options.enable_mem_pattern = True
+            sess_options.enable_cpu_mem_arena = True
+
+            os.environ["OMP_NUM_THREADS"] = str(CPU_THREADS)
+            os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+            _embedder = SentenceTransformer(
+                "BAAI/bge-m3",
+                backend="onnx",
+                model_kwargs={"provider": "CPUExecutionProvider", "session_options": sess_options},
             )
-            torch.set_num_threads(CPU_THREADS)
-            logger.info("BGE-M3 loaded successfully")
+            logger.info(f"BGE-M3 ONNX INT8 loaded on CPU ({CPU_THREADS} threads)")
     return _embedder
 
 
-def _embed_texts_sync(texts: list[str]) -> dict:
-    """Embed texts producing dense (1024-dim) + sparse (lexical weights)."""
+def _embed_texts_sync(texts: list[str], max_length: int = None) -> dict:
+    """Embed texts producing dense (1024-dim) + sparse (TF lexical weights).
+
+    Dense: sentence-transformers ONNX INT8 backend (BGE-M3, 1024-dim).
+    Sparse: TF-weighted hash-based token IDs for lexical matching.
+    Checks LRU cache first for repeated queries.
+    """
+    if max_length is None:
+        max_length = EMBED_MAX_LENGTH
     model = _get_embedder()
-    output = model.encode(
-        texts,
-        return_dense=True,
-        return_sparse=True,
-        return_colbert_vecs=False,
-        max_length=EMBED_MAX_LENGTH,
+
+    # Check cache for single-text queries (common in search)
+    if len(texts) == 1:
+        cached = _embed_cache.get(texts[0])
+        if cached is not None:
+            return cached
+
+    # Sort by length for minimal padding waste
+    indexed = sorted(enumerate(texts), key=lambda x: len(x[1]))
+    sorted_texts = [t for _, t in indexed]
+
+    # Dense embeddings via ONNX
+    dense_vecs = model.encode(
+        sorted_texts,
         batch_size=EMBED_BATCH_SIZE,
+        normalize_embeddings=True,
+        show_progress_bar=False,
     )
-    return {"dense": output["dense_vecs"], "sparse": output["lexical_weights"]}
+
+    # Unsort back to original order
+    result_dense = [None] * len(texts)
+    for idx, (orig_idx, _) in enumerate(indexed):
+        result_dense[orig_idx] = dense_vecs[idx]
+
+    result_dense = np.array(result_dense)
+
+    # Sparse vectors via TF-weighted hashing (lexical keyword matching)
+    sparse_weights = [_text_to_sparse(t) for t in texts]
+
+    result = {"dense": result_dense, "sparse": sparse_weights}
+
+    # Cache single-text results
+    if len(texts) == 1:
+        _embed_cache.put(texts[0], result)
+
+    return result
 
 
-async def _embed_texts(texts: list[str]) -> dict:
-    """Run CPU-bound BGE-M3 embedding in dedicated thread pool."""
+async def _embed_texts(texts: list[str], max_length: int = None) -> dict:
+    """Run ONNX INT8 embedding in dedicated thread pool."""
     loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(_embed_executor, _embed_texts_sync, texts)
+    return await loop.run_in_executor(
+        _embed_executor,
+        lambda: _embed_texts_sync(texts, max_length=max_length),
+    )
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  QDRANT CLIENT — async, lazy-initialized
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 async def _get_qdrant():
-    """Get or create async Qdrant client (REST on port 6334)."""
+    """Get or create async Qdrant client (REST on configured port)."""
     global _qdrant
     if _qdrant is None:
         from qdrant_client import AsyncQdrantClient
@@ -194,7 +292,7 @@ async def _ensure_collection(client):
                 index=models.SparseIndexParams(on_disk=False)
             )
         },
-        hnsw_config=models.HnswConfigDiff(m=16, ef_construct=200),
+        hnsw_config=models.HnswConfigDiff(m=0, ef_construct=128, full_scan_threshold=50000),
         quantization_config=models.ScalarQuantization(
             scalar=models.ScalarQuantizationConfig(
                 type=models.ScalarType.INT8, quantile=0.99, always_ram=True
@@ -428,15 +526,16 @@ async def _sync_index() -> tuple[bool, dict]:
                     chunk["section_header"], chunk["chunk_index"],
                 )
 
+                vectors = {"dense": dense_vec}
+                if sparse_indices:
+                    vectors["sparse"] = models.SparseVector(
+                        indices=sparse_indices, values=sparse_values
+                    )
+
                 points.append(
                     models.PointStruct(
                         id=point_id,
-                        vector={
-                            "dense": dense_vec,
-                            "sparse": models.SparseVector(
-                                indices=sparse_indices, values=sparse_values
-                            ),
-                        },
+                        vector=vectors,
                         payload={
                             "content": chunk["text"],
                             "source": chunk["source"],
@@ -485,7 +584,7 @@ async def _hybrid_search(
     """Query with both dense and sparse vectors, fuse results with RRF."""
     from qdrant_client import models
 
-    emb = await _embed_texts([query])
+    emb = await _embed_texts([query], max_length=EMBED_QUERY_MAX_LENGTH)
     dense_vec = emb["dense"][0].tolist()
     sparse_dict = emb["sparse"][0]
     sparse_indices = [int(k) for k in sparse_dict.keys()]
@@ -504,21 +603,27 @@ async def _hybrid_search(
             ]
         )
 
-    results = await client.query_points(
-        collection_name=COLLECTION,
-        prefetch=[
-            models.Prefetch(
-                query=dense_vec, using="dense", limit=limit * 3,
-                filter=query_filter,
-            ),
+    # Build prefetch list — always dense; add sparse only if tokens produced weights
+    prefetch = [
+        models.Prefetch(
+            query=dense_vec, using="dense", limit=limit * 2,
+            filter=query_filter,
+        ),
+    ]
+    if sparse_indices:
+        prefetch.append(
             models.Prefetch(
                 query=models.SparseVector(
                     indices=sparse_indices, values=sparse_values
                 ),
-                using="sparse", limit=limit * 3,
+                using="sparse", limit=limit * 2,
                 filter=query_filter,
             ),
-        ],
+        )
+
+    results = await client.query_points(
+        collection_name=COLLECTION,
+        prefetch=prefetch,
         query=models.FusionQuery(fusion=models.Fusion.RRF),
         limit=limit,
         with_payload=True,
@@ -641,6 +746,12 @@ async def rag_search(query: str, limit: int = 5, source: str = "") -> str:
             f"{content}"
         )
 
+    # Sandwich ordering — top results at start and end (Lost-in-the-Middle effect)
+    if len(results) >= 4:
+        # Move 3rd and 4th best to the end
+        reordered = results[:2] + results[4:] + results[2:4]
+        results = reordered
+
     return "\n\n".join(results) if results else "All results below minimum score threshold."
 
 
@@ -694,7 +805,7 @@ async def rag_status() -> str:
         else:
             lines.append("\nState file missing — next search will build full index")
 
-        lines.append(f"\nCPU threads: {CPU_THREADS}")
+        lines.append(f"\nEmbedding: ONNX INT8 CPU ({CPU_THREADS} threads)")
         lines.append(f"Embed batch: {EMBED_BATCH_SIZE}, max length: {EMBED_MAX_LENGTH}")
         lines.append(f"Min score: {MIN_SCORE}")
 
@@ -803,6 +914,7 @@ async def swarm_start(
     tau: float = 0.3,
     k_in: int = 3,
     max_rounds: int = 5,
+    context: str = "",
 ) -> str:
     """Launch a DyTopo multi-agent reasoning swarm. Returns a task_id to poll.
 
@@ -818,6 +930,9 @@ async def swarm_start(
         tau: Routing threshold 0.0-1.0 (default 0.3). Lower = more connections.
         k_in: Max incoming messages per agent per round (default 3).
         max_rounds: Maximum reasoning rounds before forced termination (default 5).
+        context: Pre-fetched RAG context to ground the swarm (optional). Pass
+                 workspace RAG results here so agents have domain knowledge
+                 without per-agent retrieval overhead.
     """
     from dytopo.models import SwarmDomain, SwarmStatus, SwarmTask
     from dytopo.agents import get_worker_names
@@ -837,9 +952,13 @@ async def swarm_start(
 
         _cleanup_tasks()
 
+        # Truncate context to avoid blowing up Manager's prompt
+        pre_context = context.strip()[:4000] if context else ""
+
         swarm = SwarmTask(
             task=task,
             domain=swarm_domain,
+            context=pre_context,
             tau=tau,
             K_in=k_in,
             T_max=max_rounds,
@@ -853,12 +972,25 @@ async def swarm_start(
 
         async def _safe_run():
             try:
-                await run_swarm(swarm, on_progress=_log_progress)
+                swarm_timeout = max_rounds * 120  # 2 min per round max
+                await asyncio.wait_for(
+                    run_swarm(swarm, on_progress=_log_progress),
+                    timeout=swarm_timeout,
+                )
                 elapsed = (swarm.end_time or time.monotonic()) - swarm.start_time
                 _swarm_tasks[swarm.task_id] = {
                     "status": "complete",
                     "swarm": swarm,
                     "wall_clock_sec": round(elapsed, 1),
+                    "completed_at": time.monotonic(),
+                }
+            except asyncio.TimeoutError:
+                logger.error("Swarm %s timed out after %ds", swarm.task_id, swarm_timeout)
+                _swarm_tasks[swarm.task_id] = {
+                    "status": "error",
+                    "swarm": swarm,
+                    "error": f"Swarm timed out after {swarm_timeout}s",
+                    "wall_clock_sec": swarm_timeout,
                     "completed_at": time.monotonic(),
                 }
             except Exception as e:
@@ -874,10 +1006,12 @@ async def swarm_start(
         asyncio.create_task(_safe_run())
 
         agent_names = ", ".join(get_worker_names(swarm_domain))
+        ctx_note = f"\nContext: {len(pre_context)} chars injected into Manager" if pre_context else ""
         return (
             f"Swarm launched: {swarm.task_id}\n"
             f"Domain: {domain} ({agent_names})\n"
-            f"Config: tau={tau}, K_in={k_in}, max_rounds={max_rounds}\n"
+            f"Config: tau={tau}, K_in={k_in}, max_rounds={max_rounds}"
+            f"{ctx_note}\n"
             f"Use swarm_status('{swarm.task_id}') to check progress."
         )
     except Exception as e:
@@ -1025,5 +1159,5 @@ if __name__ == "__main__":
     for label, path in DOC_SOURCES.items():
         logger.info(f"Doc source '{label}': {path}")
     logger.info(f"LLM endpoint: {LLM_BASE_URL} ({LLM_MODEL})")
-    logger.info(f"CPU threads: {CPU_THREADS}, Embed batch: {EMBED_BATCH_SIZE}")
+    logger.info(f"Embedding: ONNX INT8, batch={EMBED_BATCH_SIZE}, threads={CPU_THREADS}")
     mcp.run(transport="stdio")

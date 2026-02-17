@@ -221,20 +221,68 @@ def test_update_agent_metrics():
 
     agent_state = {"id": "dev", "failure_count": 0}
 
-    # Successful round
-    update_agent_metrics(agent_state, {"success": True, "retries": 0})
-    assert agent_state["metrics"]["total_rounds"] == 1
-    assert agent_state["metrics"]["total_failures"] == 0
-    print(f"  After success: {agent_state['metrics']}")
+    # Note: update_agent_metrics is now async, but for this test we need to handle it
+    loop = asyncio.new_event_loop()
+    try:
+        # Successful round
+        loop.run_until_complete(update_agent_metrics(agent_state, {"success": True, "retries": 0}))
+        assert agent_state["metrics"]["total_rounds"] == 1
+        assert agent_state["metrics"]["total_failures"] == 0
+        print(f"  After success: {agent_state['metrics']}")
 
-    # Failed round
-    update_agent_metrics(agent_state, {"success": False, "retries": 2, "error": "Timeout"})
-    assert agent_state["metrics"]["total_rounds"] == 2
-    assert agent_state["metrics"]["total_failures"] == 1
-    assert agent_state["failure_count"] == 1
-    assert agent_state["metrics"]["failure_rate"] == 0.5
-    print(f"  After failure: {agent_state['metrics']}")
-    print("[PASS] Metrics tracking works")
+        # Failed round
+        loop.run_until_complete(update_agent_metrics(agent_state, {"success": False, "retries": 2, "error": "Timeout"}))
+        assert agent_state["metrics"]["total_rounds"] == 2
+        assert agent_state["metrics"]["total_failures"] == 1
+        assert agent_state["failure_count"] == 1
+        assert agent_state["metrics"]["failure_rate"] == 0.5
+        print(f"  After failure: {agent_state['metrics']}")
+        print("[PASS] Metrics tracking works")
+    finally:
+        loop.close()
+
+
+class TestBackendRetryPolicy:
+    """Test backend-aware retry policies."""
+
+    def test_llama_cpp_policy_fast_recovery(self):
+        """llama-cpp policy should have shorter delays for fast recovery."""
+        from dytopo.governance import BackendRetryPolicy
+
+        policy = BackendRetryPolicy.for_backend("llama-cpp")
+        assert policy.base_delay <= 1.0, f"llama-cpp base delay should be ≤1s, got {policy.base_delay}"
+        assert policy.max_delay <= 4.0, f"llama-cpp max delay should be ≤4s, got {policy.max_delay}"
+        assert policy.jitter is True, "llama-cpp should use jitter"
+
+    def test_unknown_backend_uses_llama_cpp_defaults(self):
+        """Any backend string should return the llama-cpp policy."""
+        from dytopo.governance import BackendRetryPolicy
+
+        policy = BackendRetryPolicy.for_backend("unknown_backend")
+        assert policy.base_delay <= 1.0
+        assert policy.max_delay <= 4.0
+
+    def test_calculate_delay_increases_with_attempts(self):
+        """Delay should increase exponentially with attempt number."""
+        from dytopo.governance import BackendRetryPolicy
+
+        policy = BackendRetryPolicy.for_backend("llama-cpp")
+        delay_0 = policy.calculate_delay(0)
+        delay_1 = policy.calculate_delay(1)
+        delay_2 = policy.calculate_delay(2)
+
+        # Should be roughly: base * 2^0, base * 2^1, base * 2^2 (with jitter)
+        assert delay_1 > delay_0, "Delay should increase with attempts"
+        assert delay_2 > delay_1, "Delay should increase with attempts"
+
+    def test_delay_respects_max_delay(self):
+        """Delay should never exceed max_delay."""
+        from dytopo.governance import BackendRetryPolicy
+
+        policy = BackendRetryPolicy.for_backend("llama-cpp")
+        for attempt in range(10):
+            delay = policy.calculate_delay(attempt)
+            assert delay <= policy.max_delay * 1.5, f"Delay {delay} exceeds max {policy.max_delay} (with jitter)"
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

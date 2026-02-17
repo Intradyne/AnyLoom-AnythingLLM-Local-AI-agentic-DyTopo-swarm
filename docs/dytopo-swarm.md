@@ -4,7 +4,7 @@ DyTopo (arXiv 2602.06039) dynamically constructs agent communication topology ea
 
 ## Package Architecture
 
-DyTopo is a standalone Python package at `src/dytopo/` with 8 core modules and 5 sub-packages. The MCP server (`src/qdrant_mcp_server.py`) exposes 3 thin tools that delegate to it.
+DyTopo is a standalone Python package at `src/dytopo/` with 8 core modules and 6 sub-packages. The MCP server (`src/qdrant_mcp_server.py`) exposes 3 thin tools that delegate to it.
 
 ### Core Modules
 
@@ -15,7 +15,7 @@ DyTopo is a standalone Python package at `src/dytopo/` with 8 core modules and 5
 | `agents.py` | System prompts keyed by `(SwarmDomain, AgentRole)`, JSON schemas (`DESCRIPTOR_SCHEMA`, `AGENT_OUTPUT_SCHEMA`, `MANAGER_OUTPUT_SCHEMA`), prompt templates, `build_agent_roster()`, `get_system_prompt()`, `get_role_name()`, `get_worker_names()` |
 | `router.py` | Lazy singleton MiniLM-L6-v2, `embed_descriptors()`, `compute_similarity_matrix()`, `apply_threshold()`, `enforce_max_indegree()`, `build_routing_result()`, `log_routing_round()` |
 | `graph.py` | `build_execution_graph()` (NetworkX DiGraph), `break_cycles()` (greedy lowest-weight removal), `get_execution_order()` (Kahn's with alphabetical tiebreak), `get_execution_tiers()` (parallel-within-tier ordering via `nx.topological_generations()`), `get_incoming_agents()` |
-| `orchestrator.py` | Backend-agnostic LLM client via `_get_llm_client()` (selects LM Studio on port 1234 or vLLM on port 8000 based on config), semaphore-based concurrency via `_get_semaphore()` (1 for LM Studio, 8 for vLLM), `_llm_call()` with tenacity retry (3 attempts, exponential backoff), `_call_manager()`, `_call_worker()`, `run_swarm()` main loop with parallelized phases via `asyncio.gather()` |
+| `orchestrator.py` | Backend-agnostic LLM client via `_get_llm_client()` (connects to llama.cpp on port 8008), semaphore-based concurrency via `_get_semaphore()` (8 concurrent), `_llm_call()` with tenacity retry (3 attempts, exponential backoff), `_call_manager()`, `_call_worker()`, `run_swarm()` main loop with parallelized phases via `asyncio.gather()` |
 | `governance.py` | `execute_agent_safe()`, `detect_convergence()`, `detect_stalling()`, `recommend_redelegation()`, `update_agent_metrics()` |
 | `audit.py` | `SwarmAuditLog` class — JSONL event logging to `~/dytopo-logs/{task_id}/audit.jsonl` |
 
@@ -28,6 +28,7 @@ DyTopo is a standalone Python package at `src/dytopo/` with 8 core modules and 5
 | `messaging/` | `AgentMessage`, `MessageHistory`, `MessageRouter` | Typed message passing between agents with history tracking |
 | `routing/async_engine.py` | `AsyncRoutingEngine` | Async wrapper around `router.py` with lock-based embedding serialization |
 | `delegation/` | `DelegationManager`, `DelegationRecord` | Delegation with depth, concurrency, and timeout control |
+| `documentation/` | `DocumentationGenerator` | Auto-generated living docs from code and execution data |
 
 ### Configuration
 
@@ -35,7 +36,7 @@ DyTopo is a standalone Python package at `src/dytopo/` with 8 core modules and 5
 
 ```yaml
 llm:
-  base_url: "http://localhost:1234/v1"
+  base_url: "http://localhost:8008/v1"  # llama.cpp Docker container
   model: "qwen3-30b-a3b-instruct-2507"
   # temperature_work: 0.3
   # temperature_descriptor: 0.1
@@ -46,9 +47,8 @@ routing:
 orchestration:
   T_max: 5
 concurrency:
-  backend: "lmstudio"       # "lmstudio" (sequential) or "vllm" (parallel)
-  max_concurrent: 1         # set to 8 when using vllm
-  # vllm_base_url: "http://localhost:8000/v1"
+  backend: "llama-cpp"      # llama.cpp (parallel, default)
+  max_concurrent: 8         # 8 concurrent requests
   # connect_timeout: 10.0
   # read_timeout: 180.0
 logging:
@@ -84,7 +84,7 @@ The three-phase split is the key correctness fix: descriptors are generated *bef
 |---|---|---|
 | Descriptor generation | 0.1 | Near-deterministic structured output for routing accuracy |
 | Manager decisions | 0.1 | Consistent goal-setting and termination logic |
-| Agent work output | 0.3 | Matches LM Studio default — enough diversity for reasoning |
+| Agent work output | 0.3 | Good balance — enough diversity for reasoning without sacrificing precision |
 
 ## MCP Tool Interface
 
@@ -151,4 +151,4 @@ pip install pyyaml>=6.0 networkx>=3.0 sentence-transformers>=3.0 pydantic>=2.0
 pip install pytest-asyncio>=0.24  # dev/test dependency
 ```
 
-`sentence-transformers` shares torch with FlagEmbedding — no duplicate install. MiniLM-L6-v2 weights (~80 MB) auto-download from HuggingFace on first swarm.
+`sentence-transformers[onnx]` with `onnxruntime` for ONNX INT8 embedding. No PyTorch/CUDA required for embedding. MiniLM-L6-v2 weights (~80 MB) auto-download from HuggingFace on first swarm.

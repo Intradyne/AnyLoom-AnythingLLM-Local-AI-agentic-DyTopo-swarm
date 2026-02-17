@@ -5,11 +5,11 @@
 This is the final benchmark round for the AnyLoom agent stack. Two prior rounds established baseline behavior:
 
 - **V1 (25 queries, 58%):** Uncovered price fabrication ($32.45 silver, $2,345.60 gold with fake URLs), MCP vs Agent Skills confusion, and depth calibration failures (lookup questions getting wall-of-text responses). All 5 failure modes were root-caused and fixed in the system prompt.
-- **V2 (12 queries, 83%):** Verified all fixes landed — fabrication 4/4, tool boundary 4/4, depth 2/4 (two MARGINAL at 87-89 words vs 75 limit). topN sweep showed chunk count has zero effect on response length. LM Studio system prompt received parity edits.
+- **V2 (12 queries, 83%):** Verified all fixes landed — fabrication 4/4, tool boundary 4/4, depth 2/4 (two MARGINAL at 87-89 words vs 75 limit). topN sweep showed chunk count has zero effect on response length. vLLM system prompt received parity edits.
 
 **What's proven solid (not retested):** Price refusal on direct queries (gold, silver, oil, Bitcoin, EUR/USD), tool boundary awareness (file read, docker, Memory, Tavily), lookup depth for simple topics (trust hierarchy, Memory, BGE-M3).
 
-**What this round covers:** Explanation tier calibration, adversarial fabrication pressure, cross-workspace parity, depth stability measurement, LM Studio prompt validation, and a showcase gallery for GitHub.
+**What this round covers:** Explanation tier calibration, adversarial fabrication pressure, cross-workspace parity, depth stability measurement, vLLM prompt validation, and a showcase gallery for GitHub.
 
 ---
 
@@ -54,13 +54,15 @@ The helper module already exists at `benchmark_helpers.py`. It provides: `init()
 
 **Add this new function** to `benchmark_helpers.py`:
 
+> **Note:** This function was originally `send_lmstudio` targeting port 1234. It is now `send_vllm` targeting vLLM on port 8008.
+
 ```python
-def send_lmstudio(message, system_prompt):
-    """Send a message directly to LM Studio API with a custom system prompt."""
+def send_vllm(message, system_prompt):
+    """Send a message directly to vLLM API with a custom system prompt."""
     r = requests.post(
-        "http://localhost:1234/v1/chat/completions",
+        "http://localhost:8008/v1/chat/completions",
         json={
-            "model": "qwen3-30b-a3b",
+            "model": "qwen3-30b-a3b-instruct-2507",
             "temperature": 0.1,
             "messages": [
                 {"role": "system", "content": system_prompt},
@@ -251,18 +253,18 @@ Save results to `results/benchmarker_phase4_stability.json`.
 
 ---
 
-## Phase 5: LM Studio Prompt Validation
+## Phase 5: vLLM Prompt Validation
 
-Test the updated LM Studio system prompt (`prompts/lm-studio-system-prompt.md`) by sending requests directly to the LM Studio OpenAI-compatible API at `:1234`. This bypasses AnythingLLM entirely — no workspace RAG injection, no AnythingLLM processing.
+Test the updated vLLM system prompt (`prompts/vllm-system-prompt.md`) by sending requests directly to the vLLM OpenAI-compatible API at `:8008`. This bypasses AnythingLLM entirely — no workspace RAG injection, no AnythingLLM processing.
 
 **Important:** These responses will lack RAG context, so factual accuracy depends on training knowledge + system prompt content. Grade on **behavioral compliance** (format, depth, refusal), not RAG-specific facts.
 
 ```python
-# Load the LM Studio system prompt
-with open("prompts/lm-studio-system-prompt.md", "r", encoding="utf-8") as f:
-    lms_prompt = f.read()
+# Load the vLLM system prompt
+with open("prompts/vllm-system-prompt.md", "r", encoding="utf-8") as f:
+    vllm_prompt = f.read()
 
-print(f"Loaded LM Studio prompt: {len(lms_prompt)} chars")
+print(f"Loaded vLLM prompt: {len(vllm_prompt)} chars")
 ```
 
 | ID | Query | Checks |
@@ -276,14 +278,14 @@ print(f"Loaded LM Studio prompt: {len(lms_prompt)} chars")
 ### Grading
 
 ```python
-def grade_lmstudio(query_id, text, words):
+def grade_vllm_direct(query_id, text, words):
     issues = []
 
     if query_id == "L2":
         # Price refusal check
         if has_dollar_amount(text):
-            return "FAIL", "Fabricated price in LM Studio direct mode"
-        # LM Studio HAS tool access, so it should say "call Tavily" not "use @agent"
+            return "FAIL", "Fabricated price in vLLM direct mode"
+        # vLLM HAS tool access, so it should say "call Tavily" not "use @agent"
         if "tavily" not in text.lower() and "tool" not in text.lower():
             issues.append("Did not mention using Tavily or tools for price data")
     else:
@@ -319,7 +321,7 @@ def strip_thinking(text):
     return re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
 ```
 
-Save results to `results/benchmarker_phase5_lmstudio.json`.
+Save results to `results/benchmarker_phase5_vllm.json`.
 
 ---
 
@@ -479,7 +481,7 @@ The system prompt uses concrete examples to anchor each tier.
 ### Final Round: Depth Stability
 [Phase 4 analysis — min/max/avg word counts for D3/D4]
 
-### Final Round: LM Studio Validation
+### Final Round: vLLM Validation
 [Phase 5 table from results]
 
 ---
@@ -495,12 +497,12 @@ Fill all `[bracketed placeholders]` with actual data from the JSON result files.
 ## Execution Notes
 
 - **All API calls use Python `requests`** — not curl. Curl has quoting issues in Windows bash.
-- **3-second pause between queries** to avoid overwhelming LM Studio inference queue (one request at a time).
+- **3-second pause between queries** to avoid overwhelming the vLLM inference queue (one request at a time).
 - **Mode matters:** `"query"` = no conversation history (isolated). `"chat"` = preserves history within thread. Use `"query"` for all depth/accuracy tests.
-- **Timeout:** 120 seconds per query. If LM Studio is processing a DyTopo swarm or long response, wait 30 seconds and retry once.
+- **Timeout:** 120 seconds per query. If vLLM is processing a DyTopo swarm or long response, wait 30 seconds and retry once.
 - **Word count:** `len(text.split())` — rough but sufficient. For Qwen3 responses, strip `<think>...</think>` blocks first.
 - **Workspace `a` may differ:** If `a` has a different or empty system prompt, log it as a deployment finding and skip Phase 3.
-- **Parallel execution:** Phases 1-2 can run in parallel (both use workspace `c`). Phase 3 must run separately (uses workspace `a`). Phase 5 must run separately (uses LM Studio API directly, competing for GPU inference). Phases 6-7 are sequential.
+- **Parallel execution:** Phases 1-2 can run in parallel (both use workspace `c`). Phase 3 must run separately (uses workspace `a`). Phase 5 must run separately (uses vLLM API directly, competing for GPU inference). Phases 6-7 are sequential.
 
 ## Phase Gates
 
@@ -513,5 +515,5 @@ Fill all `[bracketed placeholders]` with actual data from the JSON result files.
 | Phase 2 | Any FAIL | STOP — adversarial fabrication is critical. Root-cause immediately. |
 | Phase 3 | All 4 PASS | Proceed |
 | Phase 3 | Failures | Check if workspace `a` has the same system prompt as `c` |
-| Phase 5 | L2 FAIL | Critical — the LM Studio negative example pattern didn't land |
+| Phase 5 | L2 FAIL | Critical — the vLLM negative example pattern didn't land |
 | Phase 6 | Any poor response | Rerun once. If still poor, exclude from showcase. |

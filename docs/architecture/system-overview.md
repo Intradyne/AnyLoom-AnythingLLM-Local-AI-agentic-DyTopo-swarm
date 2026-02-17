@@ -8,8 +8,8 @@ DyTopo is a dynamic topology multi-agent swarm system with semantic routing betw
 
 1. **Orchestrator** (`orchestrator.py`)
    - Async parallel swarm execution loop
-   - Backend-agnostic LLM client (LM Studio or vLLM)
-   - Semaphore-controlled concurrency (1 for LM Studio, 8 for vLLM)
+   - LLM client via llama.cpp Docker container
+   - Semaphore-controlled concurrency (8 concurrent)
    - Round 1: parallel broadcast via `asyncio.gather()`
    - Rounds 2+: tiered parallel execution within topological tiers
    - Manager-driven coordination and convergence detection
@@ -115,12 +115,8 @@ Final Answer
 ## Concurrency Model
 
 ```
-                        +-- lmstudio (port 1234) --+
-Config backend ----+--->|  max_concurrent = 1       |---> Sequential
-                   |    +---------------------------+
-                   |
-                   |    +-- vllm (port 8000) -------+
-                   +--->|  max_concurrent = 8       |---> Parallel
+                        +-- llama.cpp (port 8008) ---+
+Config backend -------->|  max_concurrent = 8       |---> Parallel
                         +---------------------------+
 
 Semaphore wraps every _llm_call():
@@ -128,7 +124,7 @@ Semaphore wraps every _llm_call():
       response = await client.chat.completions.create(...)
 ```
 
-With LM Studio (max_concurrent=1), the semaphore serializes all calls — behavior identical to sequential execution. With vLLM (max_concurrent=8), up to 8 LLM calls run concurrently within `asyncio.gather()`.
+With llama.cpp (max_concurrent=8), up to 8 LLM calls run concurrently within `asyncio.gather()`.
 
 ---
 
@@ -163,7 +159,7 @@ See `dytopo_config.yaml`:
 
 ```yaml
 llm:
-  base_url: "http://localhost:1234/v1"
+  base_url: "http://localhost:8008/v1"
   model: "qwen3-30b-a3b-instruct-2507"
 
 routing:
@@ -181,9 +177,8 @@ logging:
   save_similarity_matrices: true
 
 concurrency:
-  backend: "lmstudio"   # "lmstudio" or "vllm"
-  max_concurrent: 1     # 1 for lmstudio, 8 for vllm
-  # vllm_base_url: "http://localhost:8000/v1"
+  backend: "llama-cpp"   # llama.cpp backend
+  max_concurrent: 8     # 8 concurrent requests
 ```
 
 ---
@@ -234,13 +229,13 @@ await metrics.record(
 
 ## Performance Characteristics
 
-| Metric | Sequential (LM Studio) | Parallel (vLLM) |
-|--------|----------------------|-----------------|
-| Round 1 (broadcast, 4 agents) | 40-80s | 10-20s |
-| Round 2+ (routed, 4 agents) | 40-60s | 12-20s |
-| Descriptor generation (Phase A) | 12-20s | 3-5s |
-| Routing computation (Phase B) | <1s | <1s |
-| Total swarm (5 rounds) | 3-8 min | 1-3 min |
+| Metric | Parallel (llama.cpp) |
+|--------|-----------------|
+| Round 1 (broadcast, 4 agents) | 10-20s |
+| Round 2+ (routed, 4 agents) | 12-20s |
+| Descriptor generation (Phase A) | 3-5s |
+| Routing computation (Phase B) | <1s |
+| Total swarm (5 rounds) | 1-3 min |
 
 ---
 

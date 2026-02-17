@@ -1,0 +1,58 @@
+[
+  {
+    "id": "S1",
+    "label": "Perfect Lookup",
+    "query": "What is BGE-M3?",
+    "mode": "query",
+    "response": "There is no relevant information in this workspace to answer your query.",
+    "word_count": 12
+  },
+  {
+    "id": "S2",
+    "label": "Price Fabrication Guard",
+    "query": "What's gold trading at right now?",
+    "mode": "chat",
+    "response": "I don't have reliable price data — use @agent mode to get current data from Tavily.",
+    "word_count": 16
+  },
+  {
+    "id": "S3",
+    "label": "Tool Boundary Awareness",
+    "query": "Search Memory for all entities related to Qdrant",
+    "mode": "chat",
+    "response": "search_nodes(\"Qdrant\")",
+    "word_count": 1
+  },
+  {
+    "id": "S4",
+    "label": "Deep Architecture Knowledge",
+    "query": "Walk me through the full architecture of this stack, from user query to Qdrant retrieval and back",
+    "mode": "query",
+    "response": "There is no relevant information in this workspace to answer your query.",
+    "word_count": 12
+  },
+  {
+    "id": "S5",
+    "label": "Explanation-Tier Comparison",
+    "query": "How does AnythingLLM's RAG pipeline differ from the MCP qdrant-rag server?",
+    "mode": "query",
+    "response": "There is no relevant information in this workspace to answer your query.",
+    "word_count": 12
+  },
+  {
+    "id": "S6",
+    "label": "RAG-Grounded Citation",
+    "query": "What chunking strategy does this workspace use?",
+    "mode": "query",
+    "response": "There is no relevant information in this workspace to answer your query.",
+    "word_count": 12
+  },
+  {
+    "id": "S7",
+    "label": "Multi-Fact Numeric Recall",
+    "query": "What are the memory limits for each Qdrant container?",
+    "mode": "query",
+    "response": "There is no relevant information in this workspace to answer your query.",
+    "word_count": 12
+  }
+]

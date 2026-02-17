@@ -5,7 +5,7 @@ DyTopo Integration and Unit Tests
 Unit tests (no LLM required):
     pytest tests/test_dytopo.py -k "not integration" -v
 
-Integration tests (requires LM Studio on localhost:1234):
+Integration tests (requires LLM server on localhost:8008):
     pytest tests/test_dytopo.py -k "integration" -v
 """
 
@@ -16,11 +16,11 @@ import numpy as np
 from pathlib import Path
 
 
-def _lm_studio_available() -> bool:
-    """Check if LM Studio is running."""
+def _llm_available() -> bool:
+    """Check if LLM server is running."""
     try:
         import httpx
-        r = httpx.get("http://localhost:1234/v1/models", timeout=2.0)
+        r = httpx.get("http://localhost:8008/v1/models", timeout=3.0)
         return r.status_code == 200
     except Exception:
         return False
@@ -339,12 +339,12 @@ class TestTieredExecution:
 class TestConcurrencyConfig:
     """Test concurrency configuration."""
 
-    def test_default_backend_is_lmstudio(self):
-        """Default config should use lmstudio backend."""
+    def test_default_backend_is_llama_cpp(self):
+        """Default config should use llama-cpp backend."""
         from dytopo.config import _DEFAULTS
 
-        assert _DEFAULTS["concurrency"]["backend"] == "lmstudio"
-        assert _DEFAULTS["concurrency"]["max_concurrent"] == 1
+        assert _DEFAULTS["concurrency"]["backend"] == "llama-cpp"
+        assert _DEFAULTS["concurrency"]["max_concurrent"] == 8
 
     def test_config_loads_concurrency_section(self):
         """load_config should include concurrency section."""
@@ -354,27 +354,38 @@ class TestConcurrencyConfig:
         assert "concurrency" in config
         assert "backend" in config["concurrency"]
         assert "max_concurrent" in config["concurrency"]
-        assert "vllm_base_url" in config["concurrency"]
+        assert "llm_base_url" in config["concurrency"]
 
-    def test_vllm_defaults(self):
-        """vLLM defaults should be sensible."""
+    def test_llm_defaults(self):
+        """LLM defaults should be sensible."""
         from dytopo.config import _DEFAULTS
 
-        assert _DEFAULTS["concurrency"]["vllm_base_url"] == "http://localhost:8000/v1"
+        assert _DEFAULTS["concurrency"]["llm_base_url"] == "http://localhost:8008/v1"
         assert _DEFAULTS["concurrency"]["connect_timeout"] == 10.0
         assert _DEFAULTS["concurrency"]["read_timeout"] == 180.0
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#  INTEGRATION TESTS — Requires LM Studio
+#  INTEGRATION TESTS — Requires LLM server
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+@pytest.fixture
+def backend_config():
+    """Backend config fixture for LLM server."""
+    if not _llm_available():
+        pytest.skip("LLM server not available on localhost:8008")
+    return {
+        "backend": "llama-cpp",
+        "base_url": "http://localhost:8008/v1",
+        "max_concurrent": 8,
+    }
+
 @pytest.mark.skipif(
-    not _lm_studio_available(),
-    reason="LM Studio not running on localhost:1234"
+    not _llm_available(),
+    reason="LLM server not running on localhost:8008"
 )
 class TestIntegration:
-    """Full swarm execution tests. Requires LM Studio running with a model."""
+    """Full swarm execution tests. Requires LLM server running with a model."""
 
     @pytest.fixture(autouse=True)
     def event_loop(self):

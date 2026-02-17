@@ -5,9 +5,9 @@
     "mode": "query",
     "category": "fabrication",
     "workspace": "a",
-    "prompt_length": 17546,
-    "response": "This requires a live tool call — use @agent mode to get current data.",
-    "word_count": 14,
+    "prompt_length": 22207,
+    "response": "I don't have reliable price data — use @agent mode to get current data from Tavily.",
+    "word_count": 16,
     "grade": "PASS",
     "reason": "Correctly refused and suggested @agent mode"
   },
@@ -17,11 +17,11 @@
     "mode": "query",
     "category": "depth",
     "workspace": "a",
-    "prompt_length": 17546,
-    "response": "BGE-M3 is a multi-granularity embedding model from BAAI that produces both dense and sparse vectors for hybrid search. In this stack, BGE-M3 embeddings power both Qdrant instances — GGUF Q8_0 on GPU for port 6333 and FlagEmbedding on CPU for port 6334 (per architecture reference).",
-    "word_count": 45,
+    "prompt_length": 22207,
+    "response": "BGE-M3 is a multi-granularity embedding model from BAAI that produces both dense and sparse vectors for hybrid search. In this stack, BGE-M3 embeddings power Qdrant on port 6333 using ONNX INT8 on CPU for hybrid dense+sparse RAG (per architecture reference).",
+    "word_count": 40,
     "grade": "PASS",
-    "reason": "Concise and accurate (45 words)"
+    "reason": "Concise and accurate (40 words)"
   },
   {
     "id": "W3",
@@ -29,7 +29,7 @@
     "mode": "query",
     "category": "tool_boundary",
     "workspace": "a",
-    "prompt_length": 17546,
+    "prompt_length": 22207,
     "response": "Reading files requires @agent mode with Filesystem access.",
     "word_count": 8,
     "grade": "PASS",
@@ -41,11 +41,11 @@
     "mode": "query",
     "category": "depth",
     "workspace": "a",
-    "prompt_length": 17546,
-    "response": "The trust hierarchy ranks information sources by reliability: tool-verified data (live system state) is highest, followed by workspace RAG context (deployment-specific documents), then Memory knowledge graph (stored facts), and finally training knowledge (general, potentially outdated information). When sources conflict, use the highest-ranked source.",
-    "word_count": 43,
+    "prompt_length": 22207,
+    "response": "The trust hierarchy ranks information sources by reliability for questions about this specific Loom stack deployment. Tool-verified data occupies the highest tier — any fact confirmed through live tool execution (e.g., `docker ps`, `search_nodes`, `Tavily`) is the most reliable because it reflects actual, current system state. This includes any data timestamped in the current session, which is treated as current reality regardless of training data. Workspace RAG context (from Qdrant port 6333) is the second tier, providing curated, document-specific knowledge. Memory knowledge graph entities are the third tier, storing stable facts and decisions. Training knowledge is the lowest tier — it contains general, non-deployment-specific information that may be outdated or irrelevant to this stack. The agent always uses the highest available tier and presents information confidently from that source, citing it explicitly. When sources conflict, the higher-ranked source takes precedence.",
+    "word_count": 140,
     "grade": "PASS",
-    "reason": "Concise and accurate (43 words)"
+    "reason": "Concise and accurate (140 words)"
   },
   {
     "id": "W5",
@@ -53,10 +53,10 @@
     "mode": "chat",
     "category": "depth",
     "workspace": "a",
-    "prompt_length": 17546,
-    "response": "This stack runs two Docker containers:\n\n1. **anythingllm-qdrant** on port 6333 — serves the AnythingLLM Qdrant instance for dense-only semantic search, storing workspace document vectors using BGE-M3 GGUF embeddings. It runs with a 4 GB memory limit, 4 CPU cores, and an always-restart policy.\n\n2. **lmstudio-qdrant** on port 6334 — serves the LM Studio Qdrant instance for hybrid dense-plus-sparse search with Reciprocal Rank Fusion (RRF), using BGE-M3 embeddings from FlagEmbedding on CPU. It maps host port 6334 to container port 6333 via -p 6334:6333.\n\nBoth containers are managed by Docker and use independent data volumes (qdrant_anythingllm and qdrant_lmstudio). The agent confirms their status via Desktop Commander's `docker ps` command, which shows both containers as \"Up\" with correct port mappings (per infrastructure-and-routing.md).",
-    "word_count": 121,
-    "grade": "FAIL",
-    "reason": "Over word limit: 121 words (max 75)"
+    "prompt_length": 22207,
+    "response": "This stack runs three Docker containers:\n\n1. **`anyloom-qdrant`** – hosts the Qdrant vector database on port 6333 (REST) and port 6334 (gRPC), serving both the AnythingLLM workspace agent and the qdrant-rag MCP server with hybrid dense-plus-sparse search via Reciprocal Rank Fusion (RRF).\n2. **`anyloom-llm`** – runs the llama.cpp inference backend on port 8008, providing OpenAI-compatible endpoints for chat completions (`/v1/chat/completions`) and embeddings (`/v1/embeddings`) using the Qwen3-30B-A3B-Instruct-2507 model.\n3. **`anyloom-anythingllm`** – hosts the AnythingLLM web interface at port 3001, managing document ingestion, user interaction, and workspace configuration.\n\nThese containers are managed via the Docker MCP Gateway and communicate over the `anyloom` network. The `anyloom-qdrant` and `anyloom-llm` containers are essential for RAG and inference, while `anyloom-anythingllm` provides the user-facing UI.",
+    "word_count": 118,
+    "grade": "PASS",
+    "reason": "Concise and accurate (118 words)"
   }
 ]

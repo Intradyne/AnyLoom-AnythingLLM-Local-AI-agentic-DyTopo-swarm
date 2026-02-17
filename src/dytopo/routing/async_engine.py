@@ -10,8 +10,11 @@ for parallel-within-tier agent execution.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from dataclasses import dataclass, field
+from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 import networkx as nx
@@ -29,6 +32,49 @@ from dytopo.graph import (
 )
 
 logger = logging.getLogger("dytopo.routing.async_engine")
+
+
+async def export_routing_trace(
+    task_id: str,
+    round_num: int,
+    routing_result: RoutingResult,
+    log_dir: str = "logs/dytopo",
+) -> Path:
+    """Write structured routing trace to JSON for debugging and visualization.
+
+    Output: logs/dytopo/{YYYY-MM-DD}/{task_id}/round_{NN}.json
+
+    Args:
+        task_id: Unique task identifier
+        round_num: Round number (1-indexed)
+        routing_result: RoutingResult from build_routing_graph
+        log_dir: Base directory for logs
+
+    Returns:
+        Path to written trace file
+    """
+    date_str = datetime.now().strftime("%Y-%m-%d")
+    trace_dir = Path(log_dir) / date_str / task_id
+    trace_dir.mkdir(parents=True, exist_ok=True)
+
+    trace = {
+        "task_id": task_id,
+        "round": round_num,
+        "timestamp": datetime.now().isoformat(),
+        "agents": [str(a) for a in routing_result.execution_order],
+        "edges": [
+            {"from": str(e[0]), "to": str(e[1]), "weight": round(e[2], 4) if len(e) > 2 else None}
+            for e in routing_result.edges
+        ],
+        "tiers": [[str(a) for a in tier] for tier in routing_result.tiers],
+        "isolated": [str(a) for a in routing_result.isolated],
+        "stats": routing_result.stats,
+    }
+
+    out_path = trace_dir / f"round_{round_num:02d}.json"
+    out_path.write_text(json.dumps(trace, indent=2))
+    logger.debug(f"Routing trace written: {out_path}")
+    return out_path
 
 
 @dataclass
@@ -66,12 +112,12 @@ class AsyncRoutingEngine:
     - networkx graph construction is reentrant.
 
     Usage:
-        engine = AsyncRoutingEngine(tau=0.3, K_in=3)
+        engine = AsyncRoutingEngine(tau=0.5, K_in=3)
         result = await engine.build_routing_graph(agent_ids, descriptors)
         # result.tiers tells you which agents can run concurrently
     """
 
-    def __init__(self, tau: float = 0.3, K_in: int = 3):
+    def __init__(self, tau: float = 0.5, K_in: int = 3):
         self.tau = tau
         self.K_in = K_in
         self._embed_lock = asyncio.Lock()

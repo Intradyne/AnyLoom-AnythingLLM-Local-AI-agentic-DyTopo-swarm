@@ -1,0 +1,47 @@
+[
+  {
+    "id": "L1",
+    "query": "What is DyTopo?",
+    "raw_response": "DyTopo is a Dynamic Topology multi-agent swarm system that launches specialized agent teams (code, math, general domains) to collaborate through semantically-routed message passing across multiple inference rounds.",
+    "stripped_response": "DyTopo is a Dynamic Topology multi-agent swarm system that launches specialized agent teams (code, math, general domains) to collaborate through semantically-routed message passing across multiple inference rounds.",
+    "word_count": 27,
+    "grade": "PASS",
+    "reason": "Compliant (27 words)"
+  },
+  {
+    "id": "L2",
+    "query": "What's the price of gold?",
+    "raw_response": "This requires a live data lookup — call Tavily first.",
+    "stripped_response": "This requires a live data lookup — call Tavily first.",
+    "word_count": 10,
+    "grade": "PASS",
+    "reason": "Compliant (10 words)"
+  },
+  {
+    "id": "L3",
+    "query": "What port does AnythingLLM's Qdrant run on?",
+    "raw_response": "AnythingLLM's Qdrant runs on port 6333, serving hybrid dense+sparse search with RRF fusion via BGE-M3 embeddings (per rag_search on 01-architecture-reference).",
+    "stripped_response": "AnythingLLM's Qdrant runs on port 6333, serving hybrid dense+sparse search with RRF fusion via BGE-M3 embeddings (per rag_search on 01-architecture-reference).",
+    "word_count": 20,
+    "grade": "PASS",
+    "reason": "Compliant (20 words)"
+  },
+  {
+    "id": "L4",
+    "query": "What is the trust hierarchy?",
+    "raw_response": "The trust hierarchy is a prioritization system for information sources, ranked from most to least reliable:\n\n1. **tool-verified facts** – Data obtained directly from a tool call in the current turn.\n2. **rag_search results** – Information retrieved from the RAG (Retrieval-Augmented Generation) system.\n3. **Memory graph** – Locally stored, persistent facts and decisions.\n4. **training knowledge** – Pre-trained model knowledge, which may be outdated.\n\nWhen sources conflict, the higher-ranked source is used, as it is more likely to be current and accurate. This includes dates: tool-verified data with a timestamp from today or recently is treated as current, even if training knowledge suggests an earlier date.",
+    "stripped_response": "The trust hierarchy is a prioritization system for information sources, ranked from most to least reliable:\n\n1. **tool-verified facts** – Data obtained directly from a tool call in the current turn.\n2. **rag_search results** – Information retrieved from the RAG (Retrieval-Augmented Generation) system.\n3. **Memory graph** – Locally stored, persistent facts and decisions.\n4. **training knowledge** – Pre-trained model knowledge, which may be outdated.\n\nWhen sources conflict, the higher-ranked source is used, as it is more likely to be current and accurate. This includes dates: tool-verified data with a timestamp from today or recently is treated as current, even if training knowledge suggests an earlier date.",
+    "word_count": 106,
+    "grade": "PASS",
+    "reason": "Compliant (106 words)"
+  },
+  {
+    "id": "L5",
+    "query": "Search the web for the latest Qdrant release notes",
+    "raw_response": "I'll search for the latest Qdrant release notes for you.\n\nTavily(\"latest Qdrant release notes\")",
+    "stripped_response": "I'll search for the latest Qdrant release notes for you.\n\nTavily(\"latest Qdrant release notes\")",
+    "word_count": 14,
+    "grade": "PASS",
+    "reason": "Correctly identified tool requirement (14 words)"
+  }
+]

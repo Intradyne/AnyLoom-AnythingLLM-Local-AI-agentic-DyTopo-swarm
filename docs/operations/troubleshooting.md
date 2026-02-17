@@ -46,7 +46,7 @@ print(patterns["most_common_error"])
 **Solutions:**
 - **TimeoutError**: Increase timeout in config, reduce max_tokens
 - **JSONDecodeError**: Enable JSON repair, review LLM response format
-- **ConnectionError**: Check LM Studio/vLLM is running, verify base_url
+- **ConnectionError**: Check llama.cpp is running (`docker compose ps`), verify base_url
 
 ---
 

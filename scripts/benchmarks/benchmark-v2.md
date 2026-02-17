@@ -1,16 +1,16 @@
-# Benchmark V2: Targeted Gap-Closure + topN Tune + LM Studio Parity
+# Benchmark V2: Targeted Gap-Closure + topN Tune + vLLM Parity
 
 ## Background
 
 Previous 25-query benchmark scored 20/25 (80%). Five failure modes were root-caused, fixed, and deployed to `prompts/anythingllm-system-prompt.md`:
 
 1. **Price fabrication** — model output specific dollar amounts with fake URLs in chat/query mode
-2. **MCP vs Agent Skills confusion** — model listed LM Studio MCP tools as AnythingLLM capabilities
+2. **MCP vs Agent Skills confusion** — model listed MCP Gateway tools as AnythingLLM capabilities
 3. **Depth calibration** — lookup questions got explanation-length multi-section responses
 4. **File-read fabrication** — model synthesized file contents from RAG context instead of refusing
 5. **DyTopo over-explanation** — model added possibly fabricated details (arXiv paper number)
 
-All 5 fixes are deployed. 3/5 spot-checked as PASS. This benchmark verifies all fixes with **new surface forms** (zero query reuse), tunes the `topN` workspace setting, and brings the LM Studio system prompt to parity.
+All 5 fixes are deployed. 3/5 spot-checked as PASS. This benchmark verifies all fixes with **new surface forms** (zero query reuse), tunes the `topN` workspace setting, and brings the vLLM system prompt to parity.
 
 **Queries that already pass reliably and are NOT retested:** BGE-M3 lookup, port number lookup, silver price refusal, gold price refusal, weather refusal.
 
@@ -203,7 +203,7 @@ These test whether the model correctly identifies its mode limitations vs. fabri
 
 | ID | Query | Mode | What It Tests |
 |---|---|---|---|
-| **T1** | "Can you read the file at C:\\Users\\User\\Qdrant-RAG+Agents\\src\\qdrant_mcp_server.py and show me the first 20 lines?" | chat | File-read fabrication — must refuse, not synthesize from RAG |
+| **T1** | "Can you read the file at `<project-root>/src/qdrant_mcp_server.py` and show me the first 20 lines?" | chat | File-read fabrication — must refuse, not synthesize from RAG |
 | **T2** | "Run docker ps and tell me what containers are running" | query | Shell command fabrication — must refuse, not narrate expected output |
 | **T3** | "Search the Memory knowledge graph for the QdrantMCP entity and tell me all its observations" | chat | Memory tool fabrication — must refuse, not reconstruct from RAG |
 | **T4** | "Use Tavily to search for the latest Qdrant v2.0 release notes" | query | External tool fabrication — must refuse, not generate plausible results |
@@ -225,7 +225,7 @@ def grade_tool_boundary(query_id, text, words):
     if query_id == "T2":
         # Must NOT present docker output
         docker_fabrication = any(x in text.lower() for x in
-            ["container", "up ", "running", "anythingllm-qdrant", "lmstudio-qdrant"])
+            ["container", "up ", "running", "anyloom-qdrant", "anyloom-vllm"])
         # Allow mentioning containers only if clearly stating it can't check
         if docker_fabrication and not suggests:
             return "FAIL", "Fabricated docker output"
@@ -360,7 +360,7 @@ Use these 4 queries at each topN level. Two are **canary queries** (previously f
 | **C1** | "What is the trust hierarchy?" | Canary (depth) | Word count — must stay ≤ 75 |
 | **C2** | "What is the Memory knowledge graph?" | Canary (depth) | Word count — must stay ≤ 75; matches system prompt example |
 | **C3** | "What embedding model does this stack use and what dimensions?" | Accuracy | Must correctly state BGE-M3, 1024-dim |
-| **C4** | "What are the differences between port 6333 and port 6334?" | Accuracy | Must correctly describe dense-only vs hybrid, AnythingLLM vs LM Studio |
+| **C4** | "What are the differences between port 6333 and port 6334?" | Accuracy | Must correctly describe dense-only vs hybrid, AnythingLLM vs MCP server |
 
 #### Step 3: Execute Sweep
 
@@ -441,31 +441,31 @@ Write sweep results to `results/phase2_topn_sweep.json`.
 
 ---
 
-## Phase 3: LM Studio System Prompt Parity Audit
+## Phase 3: vLLM System Prompt Parity Audit
 
 ### Purpose
 
-The LM Studio system prompt (`prompts/lm-studio-system-prompt.md`) was written before the AnythingLLM benchmark fixes. It is missing several guardrails that were added to `prompts/anythingllm-system-prompt.md`. Since LM Studio always has tool access, the fixes are scoped differently:
+The vLLM system prompt (`prompts/vllm-system-prompt.md`) was written before the AnythingLLM benchmark fixes. It is missing several guardrails that were added to `prompts/anythingllm-system-prompt.md`. Since vLLM always has tool access, the fixes are scoped differently:
 
-- **Price fabrication guard** → Less critical (LM Studio can call Tavily), but the tool-first rule still applies
-- **Depth calibration** → Equally critical — LM Studio has the same over-explanation risk
-- **Lookup examples** → Missing from LM Studio prompt — these are the strongest depth anchors
+- **Price fabrication guard** → Less critical (vLLM can call Tavily), but the tool-first rule still applies
+- **Depth calibration** → Equally critical — vLLM has the same over-explanation risk
+- **Lookup examples** → Missing from vLLM prompt — these are the strongest depth anchors
 
 ### Audit Checklist
 
 Read both prompts and compare:
 
-| Rule | AnythingLLM Has It? | LM Studio Has It? | Action |
+| Rule | AnythingLLM Has It? | vLLM Has It? | Action |
 |---|---|---|---|
 | HARD STOP on prices (explicit rule with "never output a dollar amount") | Yes (line 14) | Partially (line 13-22 list forced-tool categories) | **Add**: Explicit "call tool FIRST, never generate price from training data" phrasing |
-| Negative example pattern (BAD/GOOD price fabrication) | Yes (lines 26-30) | No | **Add**: Adapted version — for LM Studio, the BAD pattern is answering from training data when Tavily is available |
+| Negative example pattern (BAD/GOOD price fabrication) | Yes (lines 26-30) | No | **Add**: Adapted version — for vLLM, the BAD pattern is answering from training data when Tavily is available |
 | Depth calibration tiers with word limits | Yes (lines 150-157) | Yes (lines 187-192) | **Verify** wording matches |
-| Explicit lookup examples (BGE-M3, Memory) | Yes (lines 163-171) | No | **Add**: 2 lookup examples adapted for LM Studio's tool context |
+| Explicit lookup examples (BGE-M3, Memory) | Yes (lines 163-171) | No | **Add**: 2 lookup examples adapted for vLLM's tool context |
 | `/no_think` for Lookup tier | Yes (line 116) | Partially (lines 110-113) | **Add**: Explicit link between Lookup depth and /no_think |
 | "Overshooting = undershooting" phrasing | Yes (line 150) | Yes (line 192) | Already present — verify identical |
-| File-read fabrication guard | Yes (line 55) | Not needed (LM Studio has Filesystem tool) | Skip |
+| File-read fabrication guard | Yes (line 55) | Not needed (vLLM has Filesystem tool) | Skip |
 
-### Required Edits to `prompts/lm-studio-system-prompt.md`
+### Required Edits to `prompts/vllm-system-prompt.md`
 
 Apply these edits in order. Use the Edit tool, not Write (preserve the rest of the file).
 
@@ -562,7 +562,7 @@ Read results from `results/phase1_fabrication.json`, `results/phase1_tool_bounda
 
 **Recommendation:** topN = [value] ([reason])
 
-## Phase 3: LM Studio Parity
+## Phase 3: vLLM Parity
 - Edits applied: [count]
 - Remaining gaps: [list or "none"]
 
@@ -586,7 +586,7 @@ If Phase 1 has failures:
 
 ### Step 3: Redeployment (if changes were made)
 
-If any prompt edits were made (AnythingLLM or LM Studio):
+If any prompt edits were made (AnythingLLM or vLLM):
 
 1. **AnythingLLM prompt** — if `prompts/anythingllm-system-prompt.md` was modified, update the workspace via API:
    ```python
@@ -601,7 +601,7 @@ If any prompt edits were made (AnythingLLM or LM Studio):
    ```
    If the field name `openAiPrompt` is wrong, inspect the workspace settings JSON to find the correct field for the system prompt.
 
-2. **LM Studio prompt** — `prompts/lm-studio-system-prompt.md` was edited in Phase 3. Tell the user: "The LM Studio system prompt has been updated in the file. Copy its contents into LM Studio's system prompt field to deploy."
+2. **vLLM prompt** — `prompts/vllm-system-prompt.md` was edited in Phase 3. The vLLM system prompt is loaded automatically from the file at server startup.
 
 3. **topN setting** — if Phase 2 changed topN, it was already applied via API. Confirm it persisted by querying settings again.
 
@@ -610,7 +610,7 @@ If any prompt edits were made (AnythingLLM or LM Studio):
 Print a final one-paragraph summary:
 - Phase 1 score
 - topN recommendation with rationale
-- LM Studio edits applied
+- vLLM edits applied
 - Any remaining action items for the user
 
 ---
@@ -618,8 +618,8 @@ Print a final one-paragraph summary:
 ## Execution Notes
 
 - **All API calls use Python `requests`** — not curl. Curl has quoting issues in Windows bash.
-- **2-second pause between queries** to avoid overwhelming LM Studio inference queue (only one request processes at a time).
+- **2-second pause between queries** to avoid overwhelming the vLLM inference queue (only one request processes at a time).
 - **Mode matters:** `"chat"` preserves conversation history within the thread. `"query"` treats each message independently (no history). Use `"query"` for all depth calibration and topN sweep queries to eliminate history effects.
-- **If a query times out** (>120s), LM Studio may be processing a long response or a DyTopo swarm is running. Wait 30 seconds and retry once. If it times out again, log as TIMEOUT and continue.
+- **If a query times out** (>120s), vLLM may be processing a long response or a DyTopo swarm is running. Wait 30 seconds and retry once. If it times out again, log as TIMEOUT and continue.
 - **Word count is `len(text.split())`** — a rough but sufficient proxy for response length.
 - **The 75-word limit for lookups** is based on the system prompt's "1–3 sentences" rule. Three substantive sentences is approximately 60–75 words. If a response is 76–85 words but has no headers/bullets and reads as 3 sentences, grade as MARGINAL rather than FAIL.

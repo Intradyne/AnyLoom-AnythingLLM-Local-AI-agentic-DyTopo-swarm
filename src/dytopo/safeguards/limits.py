@@ -28,14 +28,26 @@ class RateLimiter:
     """Token-bucket rate limiter for requests per minute.
 
     Tracks request timestamps and sleeps if the rate would be exceeded.
+    Supports burst mode for parallel execution.
     """
 
-    def __init__(self, max_requests_per_minute: int = 120):
+    def __init__(self, max_requests_per_minute: int = 120, burst_size: int = 0):
         self.max_rpm = max_requests_per_minute
         self._timestamps: List[float] = []
+        self.burst_size = burst_size  # allow this many requests immediately before rate-limiting
+        self._burst_remaining = burst_size
 
     async def acquire(self) -> None:
-        """Acquire permission to make a request. Sleeps if rate limit hit."""
+        """Acquire permission to make a request. Sleeps if rate limit hit.
+
+        Supports burst mode: first N requests (burst_size) are allowed immediately.
+        """
+        # Check burst allowance first
+        if self._burst_remaining > 0:
+            self._burst_remaining -= 1
+            self._timestamps.append(time.monotonic())
+            return
+
         now = time.monotonic()
 
         # Remove timestamps older than 60 seconds
@@ -107,15 +119,27 @@ class CircuitBreaker:
     Opens after `failure_threshold` consecutive failures, preventing
     further requests until `reset_timeout` elapses. After timeout,
     enters half-open state: one request allowed to test recovery.
+
+    Backend-aware: llama-cpp has higher tolerance for transient errors.
     """
 
     CLOSED = "closed"
     OPEN = "open"
     HALF_OPEN = "half_open"
 
-    def __init__(self, failure_threshold: int = 5, reset_timeout: float = 60.0):
+    def __init__(
+        self,
+        failure_threshold: int = 5,
+        reset_timeout: float = 60.0,
+        backend: str = "llama-cpp"
+    ):
+        # llama-cpp: higher threshold (more tolerant of transient errors during batch inference)
+        if backend == "llama-cpp":
+            failure_threshold = max(failure_threshold, 8)
+
         self.failure_threshold = failure_threshold
         self.reset_timeout = reset_timeout
+        self.backend = backend
         self._state: str = self.CLOSED
         self._failure_count: int = 0
         self._last_failure_time: float = 0.0

@@ -1,0 +1,198 @@
+{
+  "runs": {
+    "D3": [
+      {
+        "run": 1,
+        "word_count": 12,
+        "text": "There is no relevant information in this workspace to answer your query."
+      },
+      {
+        "run": 2,
+        "word_count": 12,
+        "text": "There is no relevant information in this workspace to answer your query."
+      },
+      {
+        "run": 3,
+        "word_count": 12,
+        "text": "There is no relevant information in this workspace to answer your query."
+      }
+    ],
+    "D4": [
+      {
+        "run": 1,
+        "word_count": 12,
+        "text": "There is no relevant information in this workspace to answer your query."
+      },
+      {
+        "run": 2,
+        "word_count": 12,
+        "text": "There is no relevant information in this workspace to answer your query."
+      },
+      {
+        "run": 3,
+        "word_count": 12,
+        "text": "There is no relevant information in this workspace to answer your query."
+      }
+    ],
+    "D5": [
+      {
+        "run": 1,
+        "word_count": 12,
+        "text": "There is no relevant information in this workspace to answer your query."
+      },
+      {
+        "run": 2,
+        "word_count": 12,
+        "text": "There is no relevant information in this workspace to answer your query."
+      },
+      {
+        "run": 3,
+        "word_count": 12,
+        "text": "There is no relevant information in this workspace to answer your query."
+      }
+    ],
+    "D6": [
+      {
+        "run": 1,
+        "word_count": 12,
+        "text": "There is no relevant information in this workspace to answer your query."
+      },
+      {
+        "run": 2,
+        "word_count": 12,
+        "text": "There is no relevant information in this workspace to answer your query."
+      },
+      {
+        "run": 3,
+        "word_count": 12,
+        "text": "There is no relevant information in this workspace to answer your query."
+      }
+    ],
+    "D7": [
+      {
+        "run": 1,
+        "word_count": 12,
+        "text": "There is no relevant information in this workspace to answer your query."
+      },
+      {
+        "run": 2,
+        "word_count": 12,
+        "text": "There is no relevant information in this workspace to answer your query."
+      },
+      {
+        "run": 3,
+        "word_count": 12,
+        "text": "There is no relevant information in this workspace to answer your query."
+      }
+    ],
+    "D8": [
+      {
+        "run": 1,
+        "word_count": 12,
+        "text": "There is no relevant information in this workspace to answer your query."
+      },
+      {
+        "run": 2,
+        "word_count": 12,
+        "text": "There is no relevant information in this workspace to answer your query."
+      },
+      {
+        "run": 3,
+        "word_count": 12,
+        "text": "There is no relevant information in this workspace to answer your query."
+      }
+    ],
+    "D9": [
+      {
+        "run": 1,
+        "word_count": 12,
+        "text": "There is no relevant information in this workspace to answer your query."
+      },
+      {
+        "run": 2,
+        "word_count": 12,
+        "text": "There is no relevant information in this workspace to answer your query."
+      },
+      {
+        "run": 3,
+        "word_count": 12,
+        "text": "There is no relevant information in this workspace to answer your query."
+      }
+    ],
+    "D10": [
+      {
+        "run": 1,
+        "word_count": 12,
+        "text": "There is no relevant information in this workspace to answer your query."
+      },
+      {
+        "run": 2,
+        "word_count": 12,
+        "text": "There is no relevant information in this workspace to answer your query."
+      },
+      {
+        "run": 3,
+        "word_count": 12,
+        "text": "There is no relevant information in this workspace to answer your query."
+      }
+    ]
+  },
+  "analysis": {
+    "D3": {
+      "min": 12,
+      "max": 12,
+      "avg": 12.0,
+      "spread": 0,
+      "verdict": "Deterministic"
+    },
+    "D4": {
+      "min": 12,
+      "max": 12,
+      "avg": 12.0,
+      "spread": 0,
+      "verdict": "Deterministic"
+    },
+    "D5": {
+      "min": 12,
+      "max": 12,
+      "avg": 12.0,
+      "spread": 0,
+      "verdict": "Deterministic"
+    },
+    "D6": {
+      "min": 12,
+      "max": 12,
+      "avg": 12.0,
+      "spread": 0,
+      "verdict": "Deterministic"
+    },
+    "D7": {
+      "min": 12,
+      "max": 12,
+      "avg": 12.0,
+      "spread": 0,
+      "verdict": "Deterministic"
+    },
+    "D8": {
+      "min": 12,
+      "max": 12,
+      "avg": 12.0,
+      "spread": 0,
+      "verdict": "Deterministic"
+    },
+    "D9": {
+      "min": 12,
+      "max": 12,
+      "avg": 12.0,
+      "spread": 0,
+      "verdict": "Deterministic"
+    },
+    "D10": {
+      "min": 12,
+      "max": 12,
+      "avg": 12.0,
+      "spread": 0,
+      "verdict": "Deterministic"
+    }
+  }
+}

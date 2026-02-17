@@ -1,0 +1,26 @@
+{
+  "active": true,
+  "hubId": "smart-web-reader",
+  "name": "Smart Web Reader",
+  "schema": "skill-1.0.0",
+  "version": "1.0.0",
+  "description": "Fetches a web page and extracts clean readable content as markdown. Works for most static and server-rendered pages. More reliable than built-in web-scraper for content extraction.",
+  "author": "@anyloom",
+  "license": "MIT",
+  "setup_args": {},
+  "examples": [
+    {"prompt": "Read the content from https://example.com/article", "call": "{\"url\": \"https://example.com/article\"}"},
+    {"prompt": "Summarize this web page: https://news.ycombinator.com", "call": "{\"url\": \"https://news.ycombinator.com\"}"},
+    {"prompt": "What does this page say? https://en.wikipedia.org/wiki/Large_language_model", "call": "{\"url\": \"https://en.wikipedia.org/wiki/Large_language_model\"}"}
+  ],
+  "entrypoint": {
+    "file": "handler.js",
+    "params": {
+      "url": {
+        "description": "The full URL of the web page to read (must start with http:// or https://)",
+        "type": "string"
+      }
+    }
+  },
+  "imported": false
+}

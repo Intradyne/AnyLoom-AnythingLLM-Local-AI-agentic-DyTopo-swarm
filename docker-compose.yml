@@ -1,0 +1,175 @@
+services:
+  # ============================================================================
+  # Qdrant Vector Database
+  # ============================================================================
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: anyloom-qdrant
+    restart: unless-stopped
+    ports:
+      - "${QDRANT_PORT:-6333}:6333"
+      - "${QDRANT_GRPC_PORT:-6334}:6334"  # gRPC port
+    volumes:
+      - qdrant_storage:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    networks:
+      - anyloom
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/6333'"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  # ============================================================================
+  # LLM Inference Engine — llama.cpp server (GPU Required)
+  # Build local Blackwell image: bash scripts/build_llm_image.sh
+  # Falls back to official image (PTX JIT, ~10x slower on RTX 5090).
+  # ============================================================================
+  llm:
+    image: ${LLM_IMAGE:-local/llama.cpp:server-cuda-blackwell}
+    container_name: anyloom-llm
+    restart: "no"  # Use "on-failure" when stable
+    ports:
+      - "${LLM_PORT:-8008}:8080"
+    volumes:
+      - ${LLM_MODEL_DIR:-./models}:/models:ro
+    environment:
+      - GGML_CUDA_GRAPH_OPT=1
+    command: >
+      --model /models/Qwen3-30B-A3B-Instruct-2507-Q4_K_M.gguf
+      --alias gpt-4
+      --ctx-size ${LLM_CONTEXT_SIZE:-131072}
+      --n-gpu-layers 99
+      --flash-attn on
+      --fit on
+      --cache-type-k q8_0
+      --cache-type-v q8_0
+      --batch-size 8192
+      --ubatch-size 4096
+      --threads 8
+      --threads-batch 16
+      --jinja
+      --slots
+      -np 2
+      -sps 0.5
+      --host 0.0.0.0
+      --port 8080
+    ipc: host
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    networks:
+      - anyloom
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 120s  # Model loading through WSL2/Docker
+
+  # ============================================================================
+  # Embedding Engine — llama.cpp server (GPU, BGE-M3 for AnythingLLM dense-only)
+  # BGE-M3 Q8_0 is ~635 MB VRAM — fits alongside the LLM on 32 GB GPUs.
+  # IMPORTANT: llama.cpp divides ctx-size across parallel slots.
+  #   ctx-size 16384 / parallel 2 = 8192 tokens per slot (BGE-M3 max).
+  #   If you change --parallel, adjust --ctx-size = 8192 * N.
+  # ============================================================================
+  embedding:
+    image: ${LLM_IMAGE:-local/llama.cpp:server-cuda-blackwell}
+    container_name: anyloom-embedding
+    restart: unless-stopped
+    ports:
+      - "${EMBEDDING_PORT:-8009}:8080"
+    volumes:
+      - ${LLM_MODEL_DIR:-./models}:/models:ro
+    command: >
+      --model /models/bge-m3-q8_0.gguf
+      --embeddings
+      --ctx-size 16384
+      --batch-size 8192
+      --ubatch-size 8192
+      --n-gpu-layers 99
+      --flash-attn on
+      --parallel 2
+      --threads 4
+      --host 0.0.0.0
+      --port 8080
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    networks:
+      - anyloom
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ============================================================================
+  # AnythingLLM UI (Optional)
+  # ============================================================================
+  anythingllm:
+    image: mintplexlabs/anythingllm:latest
+    container_name: anyloom-anythingllm
+    restart: unless-stopped
+    shm_size: "1g"  # Chrome uses /dev/shm for IPC; Docker default 64MB causes BUS_ADRERR crashes
+    init: true      # Reaps zombie Chrome processes (Node.js as PID 1 won't)
+    ports:
+      - "${ANYTHINGLLM_PORT:-3001}:3001"
+    volumes:
+      - anythingllm_storage:/app/server/storage
+      - anythingllm_hotdir:/app/collector/hotdir
+    environment:
+      - STORAGE_DIR=/app/server/storage
+      - UID=${ANYTHINGLLM_UID:-1000}
+      - GID=${ANYTHINGLLM_GID:-1000}
+      - NODE_OPTIONS=--dns-result-order=ipv4first  # Qdrant binds IPv4 only
+      - ANYTHINGLLM_CHROMIUM_ARGS=--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage,--disable-gpu,--no-zygote,--disable-software-rasterizer
+    networks:
+      - anyloom
+    depends_on:
+      qdrant:
+        condition: service_healthy
+      llm:
+        condition: service_started  # Don't block UI on LLM model load
+      embedding:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:3001/api/v1/system || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+# ============================================================================
+# Networks
+# ============================================================================
+networks:
+  anyloom:
+    name: anyloom
+    driver: bridge
+
+# ============================================================================
+# Volumes (external — pre-existing from initial setup)
+# ============================================================================
+volumes:
+  qdrant_storage:
+    name: anyloom_qdrant_storage
+    external: true
+  anythingllm_storage:
+    name: anyloom_anythingllm_storage
+    external: true
+  anythingllm_hotdir:
+    name: anyloom_anythingllm_hotdir
+    external: true

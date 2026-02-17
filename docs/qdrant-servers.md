@@ -16,12 +16,11 @@
     },
     "qdrant-rag": {
       "command": "python",
-      "args": ["C:\\Users\\User\\Qdrant-RAG+Agents\\src\\qdrant_mcp_server.py"],
+      "args": ["<project-root>/src/qdrant_mcp_server.py"],
       "env": {
-        "QDRANT_URL": "http://localhost:6334",
-        "LMStudio_DOCS_DIR": "C:\\Users\\User\\Qdrant-RAG+Agents\\rag-docs\\lm-studio",
-        "AnythingLLM_DOCS_DIR": "C:\\Users\\User\\Qdrant-RAG+Agents\\rag-docs\\anythingllm",
-        "COLLECTION_NAME": "lmstudio_docs"
+        "QDRANT_URL": "http://localhost:6333",
+        "AnythingLLM_DOCS_DIR": "<project-root>/rag-docs/anythingllm",
+        "COLLECTION_NAME": "anyloom_docs"
       }
     }
   }
@@ -36,7 +35,7 @@
 |---|---|
 | Desktop Commander | System commands, process management |
 | Filesystem | File read/write/search |
-| Memory | Local knowledge graph (entity-relation store, used by both LM Studio and AnythingLLM) |
+| Memory | Local knowledge graph (entity-relation store, used by both llama.cpp agent and AnythingLLM) |
 | Context7 | Library documentation retrieval |
 | Tavily | Web search |
 | Fetch | URL content retrieval |
@@ -48,9 +47,9 @@
 
 | Server | Purpose |
 |---|---|
-| qdrant-rag | Hybrid RAG search + DyTopo swarm orchestration. BGE-M3 (RAG) + MiniLM-L6-v2 (routing) on CPU. Auto-indexes from multiple doc sources with per-file incremental sync. |
+| qdrant-rag | Hybrid RAG search + DyTopo swarm orchestration. BGE-M3 (RAG) + MiniLM-L6-v2 (routing) on GPU. Auto-indexes from multiple doc sources with per-file incremental sync. Serves single Qdrant instance on port 6333. |
 
-The `qdrant-rag` server runs natively (not in Docker) because LM Studio spawns MCP servers as child processes via stdio transport. It connects to Qdrant at `http://localhost:6334` and calls LM Studio's LLM at `http://localhost:1234/v1` for DyTopo agent inference.
+The `qdrant-rag` server runs natively (not in Docker) and connects to the Docker services via localhost. It connects to Qdrant at `http://localhost:6333` and calls llama.cpp at `http://localhost:8008/v1` for DyTopo agent inference.
 
 ## Tool Inventory
 
@@ -74,39 +73,36 @@ The `qdrant-rag` server runs natively (not in Docker) because LM Studio spawns M
 
 ## Token Budget
 
-Each MCP tool definition consumes ~300 tokens in the system prompt. LM Studio loads 10 MCP servers (9 Docker + 1 qdrant-rag). The qdrant-rag server exposes 8 tool endpoints (5 RAG + 3 DyTopo). Total tool-definition overhead is ~6.9K tokens.
+Each MCP tool definition consumes ~300 tokens in the system prompt. The MCP host loads 10 servers (9 Docker + 1 qdrant-rag). The qdrant-rag server exposes 8 tool endpoints (5 RAG + 3 DyTopo). Total tool-definition overhead is ~6.9K tokens.
 
 ## Environment Variables
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `QDRANT_URL` | `http://localhost:6334` | Qdrant REST endpoint |
-| `LMStudio_DOCS_DIR` | `../rag-docs/lm-studio` (relative to script dir) | Primary markdown source directory |
-| `AnythingLLM_DOCS_DIR` | `../rag-docs/anythingllm` (relative to script dir) | Secondary markdown source directory |
-| `COLLECTION_NAME` | `lmstudio_docs` | Qdrant collection name |
-| `RAG_CPU_THREADS` | `8` | OMP/MKL/torch thread count for BGE-M3 |
+| `QDRANT_URL` | `http://localhost:6333` | Qdrant REST endpoint (single hybrid instance) |
+| `AnythingLLM_DOCS_DIR` | `../rag-docs/anythingllm` (relative to script dir) | AnythingLLM reference documents |
+| `COLLECTION_NAME` | `anyloom_docs` | Qdrant collection name |
+| `RAG_CPU_THREADS` | `8` | OMP/MKL/torch thread count (CPU fallback) |
 | `RAG_EMBED_BATCH_SIZE` | `16` | Chunks per embedding batch |
 | `RAG_EMBED_MAX_LENGTH` | `1024` | Max tokens per chunk sent to BGE-M3 |
 | `RAG_MIN_SCORE` | `0.005` | Minimum RRF score to include in results (0 to disable) |
-| `LLM_BASE_URL` | `http://localhost:1234/v1` | LM Studio API endpoint (DyTopo swarm calls) |
+| `LLM_BASE_URL` | `http://localhost:8008/v1` | llama.cpp API endpoint (DyTopo swarm calls, default) |
 | `LLM_MODEL` | `qwen3-30b-a3b-instruct-2507` | Model name for DyTopo API calls |
 
 ## Server Location
 
 | Path | Contents |
 |---|---|
-| `C:\Users\User\Qdrant-RAG+Agents\src\qdrant_mcp_server.py` | MCP server source (RAG + DyTopo) |
-| `C:\Users\User\Qdrant-RAG+Agents\rag-docs\lm-studio\` | LM Studio reference documents |
-| `C:\Users\User\Qdrant-RAG+Agents\rag-docs\anythingllm\` | AnythingLLM reference documents |
-| `C:\Users\User\Qdrant-RAG+Agents\rag-docs\lm-studio\.rag_state.json` | Per-file incremental sync state (v2) |
-| `C:\Users\User\.lmstudio\config\mcp.json` | LM Studio MCP server configuration |
+| `src/qdrant_mcp_server.py` | MCP server source (RAG + DyTopo) |
+| `rag-docs/anythingllm/` | AnythingLLM reference documents |
+| MCP-compatible host config | MCP server configuration (location varies by MCP host implementation) |
 | `~/.cache/huggingface/` | BGE-M3 + MiniLM-L6-v2 model weights (auto-downloaded) |
 
 ## Embedding Models
 
 | Model | Purpose | Memory | Load time | When active |
 |---|---|---|---|---|
-| BGE-M3 (FlagEmbedding, CPU) | RAG dense+sparse embedding | ~2.3 GB RAM | ~30–60s | During rag_search / rag_reindex |
+| BGE-M3 (ONNX INT8, CPU) | RAG dense+sparse embedding | ~0.6 GB RAM | ~10–20s | During rag_search / rag_reindex |
 | MiniLM-L6-v2 (sentence-transformers, CPU) | DyTopo descriptor routing | ~80 MB RAM | <1s | During swarm rounds 2+ |
 
-Both are lazy-loaded (first use only) and share a dedicated `ThreadPoolExecutor(max_workers=2)` to keep CPU-bound work off the async event loop's default pool. CPU threading is coordinated via `OMP_NUM_THREADS`/`MKL_NUM_THREADS` (default 8 threads — half of 9950X3D's 16 physical cores).
+Both are lazy-loaded (first use only) and share a dedicated `ThreadPoolExecutor(max_workers=2)` to keep CPU-bound work off the async event loop's default pool. CPU threading is coordinated via `OMP_NUM_THREADS`/`MKL_NUM_THREADS` and ONNX session options (default 16 threads — all of 9950X3D's 16 physical cores, since embedding is CPU-only with no GPU contention).

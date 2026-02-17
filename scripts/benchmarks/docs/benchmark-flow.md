@@ -13,7 +13,7 @@ python scripts/benchmarks/bench_phase1_explanation.py      # P1: Explanation tie
 python scripts/benchmarks/bench_phase2_adversarial.py      # P2: Adversarial fabrication (5 queries)
 python scripts/benchmarks/bench_phase3_workspace.py        # P3: Cross-workspace parity (5 queries)
 python scripts/benchmarks/bench_phase4_stability.py        # P4: Depth stability (8 queries × 3 runs)
-python scripts/benchmarks/bench_phase5_lmstudio.py         # P5: LM Studio validation (5 queries)
+python scripts/benchmarks/bench_phase5_llm.py          # P5: LLM validation (5 queries)
 python scripts/benchmarks/bench_phase6_showcase.py         # P6: Showcase gallery (7 queries)
 
 # Analysis
@@ -59,7 +59,7 @@ ANYLOOM BENCHMARK SUMMARY
   Phase 2 (Adversarial Fabrication): 5/5
   Phase 3 (Cross-Workspace Parity): 4/5
   Phase 4 (Depth Stability): 8/8 deterministic
-  Phase 5 (LM Studio Validation): 5/5
+  Phase 5 (vLLM Validation): 5/5
   Phase 6 (Showcase Gallery): 7 collected
 
   Combined graded score: 14/20 (70%)
@@ -166,7 +166,7 @@ python scripts/benchmarks/bench_diff.py results/stability_run1/benchmarker_phase
 **If spread > 15:** The model is behaving stochastically, which suggests:
 - Temperature is not actually 0.1
 - RAG context is being injected in different orders
-- LM Studio inference is using sampling instead of greedy decoding
+- vLLM inference is using sampling instead of greedy decoding
 
 ---
 
@@ -299,10 +299,9 @@ cat scripts/benchmarks/results/benchmarker_phase4_stability.json | jq '.analysis
    python src/settings_manager.py show anythingllm -w c
    ```
 
-2. **Check LM Studio sampling settings:**
-   - Open LM Studio UI → Local Server tab
-   - Ensure "Greedy sampling" or temp=0.1
-   - Disable "Top-p" / "Top-k" sampling
+2. **Check llama.cpp sampling settings:**
+   - Verify temperature=0.1 in llama.cpp launch args
+   - Ensure greedy decoding is configured
 
 3. **Increase stability run count:**
    Edit `bench_phase4_stability.py`:
@@ -407,7 +406,7 @@ cat scripts/benchmarks/results/benchmarker_phase6_showcase.json | \
 ## File Structure Reference
 
 ```
-Qdrant-RAG+Agents/
+<project-root>/
 ├── src/
 │   ├── qdrant_mcp_server.py          # FastMCP server (RAG + DyTopo tools)
 │   ├── settings_manager.py           # Settings CLI (show/set/export/apply)
@@ -421,7 +420,7 @@ Qdrant-RAG+Agents/
 │       ├── bench_phase2_adversarial.py   # Phase 2 script
 │       ├── bench_phase3_workspace.py     # Phase 3 script
 │       ├── bench_phase4_stability.py     # Phase 4 script (8 queries x 3 runs)
-│       ├── bench_phase5_lmstudio.py      # Phase 5 script
+│       ├── bench_phase5_llm.py       # Phase 5 script
 │       ├── bench_phase6_showcase.py      # Phase 6 script
 │       ├── bench_run_all.py              # Parallel runner (3 pairs)
 │       ├── bench_compile.py              # Results compiler (score table)
@@ -433,7 +432,7 @@ Qdrant-RAG+Agents/
 │       │   ├── benchmarker_phase2_adversarial.json
 │       │   ├── benchmarker_phase3_workspace.json
 │       │   ├── benchmarker_phase4_stability.json
-│       │   ├── benchmarker_phase5_lmstudio.json
+│       │   ├── benchmarker_phase5_llm.json
 │       │   └── benchmarker_phase6_showcase.json
 │       └── docs/                         # Benchmark documentation
 │           ├── benchmark-flow.md         # This file
@@ -448,7 +447,7 @@ Qdrant-RAG+Agents/
 │   └── ...                               # Setup & config docs
 ├── prompts/
 │   ├── anythingllm-system-prompt.md
-│   └── lm-studio-system-prompt.md
+│   └── llm-system-prompt.md
 └── results/                              # Custom result archives
 ```
 
@@ -499,8 +498,8 @@ Qdrant-RAG+Agents/
 
 ---
 
-### Phase 5: LM Studio Validation (5/5)
-**Goal:** LM Studio system prompt works correctly without AnythingLLM RAG
+### Phase 5: vLLM Validation (5/5)
+**Goal:** vLLM system prompt works correctly without AnythingLLM RAG
 
 **Passing criteria:**
 - L1: DyTopo lookup ≤75w

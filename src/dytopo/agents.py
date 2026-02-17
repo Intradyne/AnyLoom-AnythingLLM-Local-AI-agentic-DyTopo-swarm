@@ -141,9 +141,14 @@ or timeout, proceed with the information you have."""
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 def _make_worker_prompt(role_name: str, role_desc: str) -> str:
-    """Build a worker agent system prompt with role + descriptor instructions."""
+    """Build a worker agent system prompt with role + descriptor instructions.
+
+    Prepends /no_think to skip Qwen3's thinking phase, saving 2K-30K
+    reasoning tokens per call.  Manager prompts are built separately and
+    keep full reasoning.
+    """
     return (
-        f"You are the {role_name} agent.\n\n"
+        f"/no_think\nYou are the {role_name} agent.\n\n"
         f"{role_desc}\n\n"
         f"{PROMPT_INJECTION_GUARD}\n\n"
         f"{WORK_INSTRUCTIONS}"

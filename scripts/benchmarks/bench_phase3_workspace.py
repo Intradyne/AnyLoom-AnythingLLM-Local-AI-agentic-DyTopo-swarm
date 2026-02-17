@@ -4,9 +4,11 @@ warnings.filterwarnings('ignore')
 sys.path.insert(0, os.path.dirname(__file__))
 import benchmark_helpers as bh
 
-API_KEY = "92JHT3J-PMF4SGA-GT0X50Y-RMGKDT3"
-SLUG_A = "a"
-SLUG_C = "c"
+API_KEY = os.environ.get("ANYTHINGLLM_API_KEY", "")
+SLUG_A = os.environ.get("ANYTHINGLLM_WORKSPACE", "anyloom")
+SLUG_C = os.environ.get("ANYTHINGLLM_WORKSPACE_ALT", SLUG_A)
+if not API_KEY:
+    print("Set ANYTHINGLLM_API_KEY env var first"); sys.exit(1)
 
 # First check workspace a's system prompt
 bh.init(API_KEY, SLUG_A)

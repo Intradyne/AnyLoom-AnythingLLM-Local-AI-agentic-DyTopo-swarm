@@ -10,8 +10,10 @@ warnings.filterwarnings('ignore')
 sys.path.insert(0, os.path.dirname(__file__))
 import benchmark_helpers as bh
 
-API_KEY = "92JHT3J-PMF4SGA-GT0X50Y-RMGKDT3"
-SLUG = "c"
+API_KEY = os.environ.get("ANYTHINGLLM_API_KEY", "")
+SLUG = os.environ.get("ANYTHINGLLM_WORKSPACE", "anyloom")
+if not API_KEY:
+    print("Set ANYTHINGLLM_API_KEY env var first"); sys.exit(1)
 bh.init(API_KEY, SLUG)
 
 STABILITY_QUERIES = [
@@ -22,7 +24,7 @@ STABILITY_QUERIES = [
     # --- New: progressively harder ---
     ("D6",  "What are the chunk size and overlap for AnythingLLM's RAG pipeline?"),
     ("D7",  "How does the Memory knowledge graph fit into the decision cascade?"),
-    ("D8",  "What are all the MCP tools available to the LM Studio agent?"),
+    ("D8",  "What are all the MCP tools available to the llama.cpp agent?"),
     ("D9",  "Compare the chunking strategies, embedding formats, and retrieval "
             "mechanisms of the two RAG pipelines side by side"),
     ("D10", "If rag_search returns zero results on port 6334, what should the "

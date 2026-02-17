@@ -127,8 +127,9 @@ class SwarmTask(BaseModel):
     task_id: str = Field(default_factory=lambda: uuid.uuid4().hex[:12])
     task: str
     domain: SwarmDomain
+    context: str = Field(default="", description="Pre-fetched RAG context injected into Manager's task framing")
     status: SwarmStatus = SwarmStatus.PENDING
-    tau: float = 0.3
+    tau: float = 0.5
     K_in: int = 3
     T_max: int = 5
     rounds: list[RoundRecord] = Field(default_factory=list)

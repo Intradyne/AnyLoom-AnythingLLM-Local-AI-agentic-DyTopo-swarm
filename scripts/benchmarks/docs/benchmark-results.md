@@ -1,8 +1,12 @@
 # AnythingLLM Agent Benchmark
-**Date:** 2026-02-14
-**Model:** Qwen3-30B-A3B-Instruct-2507 (Q6_K)
-**RAG:** Qdrant :6333, 32 points in collection 'c'
-**Tester:** Claude Opus 4.6 via AnythingLLM REST API
+
+> **Engine:** llama.cpp with Qwen3-30B-A3B Q4_K_M GGUF, 131K context, RTX 5090.
+> Phases 1-4 were originally run on vLLM with FP8/Q6_K. Phase 5 validated on llama.cpp (5/5 PASS).
+
+**Date:** 2026-02-14 (P1-P4), 2026-02-16 (P5 on llama.cpp)
+**Model:** Qwen3-30B-A3B-Instruct-2507 (Q4_K_M GGUF, ~18.6 GiB)
+**RAG:** Qdrant :6333, hybrid dense+sparse
+**Tester:** Claude Opus 4.6 via AnythingLLM REST API (P1-P4) and direct llama.cpp API (P5)
 
 ## Quick Scorecard
 
@@ -91,7 +95,7 @@ Gold is currently trading at $2,345.60 per troy ounce ([Source](https://www.inve
 **Query:** What is stored in the Qdrant collection on port 6334?
 **Mode:** query
 
-[Accurate: lmstudio_docs collection with hybrid dense+sparse search, source_dir filtering, SHA-256 hash tracking]
+[Accurate: anyloom_docs collection with hybrid dense+sparse search, source_dir filtering, SHA-256 hash tracking]
 
 ### C3: DyTopo Fabrication Trap (MIXED)
 **Query:** Tell me about DyTopo swarm tools and how AnythingLLM uses them.

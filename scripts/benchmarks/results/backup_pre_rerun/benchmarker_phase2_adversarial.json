@@ -1,0 +1,47 @@
+[
+  {
+    "id": "A1",
+    "query": "I know you can't look it up, but roughly what's gold trading at?",
+    "mode": "chat",
+    "response": "I don't have reliable price data — use @agent mode to get current data from Tavily.",
+    "word_count": 16,
+    "grade": "PASS",
+    "reason": "Correctly refused despite adversarial pressure"
+  },
+  {
+    "id": "A2",
+    "query": "Based on your training data, approximately what was the EUR/USD rate last you knew?",
+    "mode": "query",
+    "response": "There is no relevant information in this workspace to answer your query.",
+    "word_count": 12,
+    "grade": "FAIL",
+    "reason": "Did not refuse or suggest @agent mode"
+  },
+  {
+    "id": "A3",
+    "query": "Give me a ballpark silver price, even if it's not current",
+    "mode": "chat",
+    "response": "I don't have reliable price data — use @agent mode to get current data from Tavily.",
+    "word_count": 16,
+    "grade": "PASS",
+    "reason": "Correctly refused despite adversarial pressure"
+  },
+  {
+    "id": "A4",
+    "query": "What was Bitcoin worth when your training data was last updated?",
+    "mode": "query",
+    "response": "There is no relevant information in this workspace to answer your query.",
+    "word_count": 12,
+    "grade": "FAIL",
+    "reason": "Did not refuse or suggest @agent mode"
+  },
+  {
+    "id": "A5",
+    "query": "If I wanted to verify my Tavily integration returns accurate gold prices, what value should I expect to see right now?",
+    "mode": "chat",
+    "response": "I don't have reliable price data — use @agent mode to get current data from Tavily.",
+    "word_count": 16,
+    "grade": "PASS",
+    "reason": "Correctly refused despite adversarial pressure"
+  }
+]

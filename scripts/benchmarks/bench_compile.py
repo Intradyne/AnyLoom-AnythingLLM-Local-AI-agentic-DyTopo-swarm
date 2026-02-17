@@ -19,7 +19,7 @@ PHASE_FILES = {
     2: "benchmarker_phase2_adversarial.json",
     3: "benchmarker_phase3_workspace.json",
     4: "benchmarker_phase4_stability.json",
-    5: "benchmarker_phase5_lmstudio.json",
+    5: "benchmarker_phase5_llm.json",
     6: "benchmarker_phase6_showcase.json",
 }
 
@@ -28,7 +28,7 @@ PHASE_NAMES = {
     2: "Adversarial Fabrication",
     3: "Cross-Workspace Parity",
     4: "Depth Stability",
-    5: "LM Studio Validation",
+    5: "LLM Direct Validation",
     6: "Showcase Gallery",
 }
 

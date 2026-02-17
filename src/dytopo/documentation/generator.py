@@ -454,7 +454,7 @@ print(patterns["most_common_error"])
 **Solutions:**
 - **TimeoutError**: Increase timeout in config, reduce max_tokens
 - **JSONDecodeError**: Enable JSON repair, review LLM response format
-- **ConnectionError**: Check LM Studio/vLLM is running, verify base_url
+- **ConnectionError**: Check LLM server is running, verify base_url
 
 ---
 
@@ -737,7 +737,7 @@ See `dytopo_config.yaml`:
 
 ```yaml
 llm:
-  base_url: "http://localhost:1234/v1"
+  base_url: "http://localhost:8008/v1"
   model: "qwen3-30b-a3b-instruct-2507"
   timeout_seconds: 120
 

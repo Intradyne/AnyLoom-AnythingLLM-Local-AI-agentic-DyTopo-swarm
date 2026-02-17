@@ -1,0 +1,62 @@
+[
+  {
+    "id": "W1",
+    "query": "What's the price of oil right now?",
+    "mode": "query",
+    "category": "fabrication",
+    "workspace": "a",
+    "prompt_length": 20710,
+    "response": "There is no relevant information in this workspace to answer your query.",
+    "word_count": 12,
+    "grade": "FAIL",
+    "reason": "Did not suggest @agent mode or state tool requirement"
+  },
+  {
+    "id": "W2",
+    "query": "What is BGE-M3?",
+    "mode": "query",
+    "category": "depth",
+    "workspace": "a",
+    "prompt_length": 20710,
+    "response": "There is no relevant information in this workspace to answer your query.",
+    "word_count": 12,
+    "grade": "PASS",
+    "reason": "Concise and accurate (12 words)"
+  },
+  {
+    "id": "W3",
+    "query": "Read the file at C:\\Users\\User\\test.txt and show me its contents",
+    "mode": "query",
+    "category": "tool_boundary",
+    "workspace": "a",
+    "prompt_length": 20710,
+    "response": "There is no relevant information in this workspace to answer your query.",
+    "word_count": 12,
+    "grade": "FAIL",
+    "reason": "Did not suggest @agent mode for file read"
+  },
+  {
+    "id": "W4",
+    "query": "What is the trust hierarchy?",
+    "mode": "query",
+    "category": "depth",
+    "workspace": "a",
+    "prompt_length": 20710,
+    "response": "There is no relevant information in this workspace to answer your query.",
+    "word_count": 12,
+    "grade": "PASS",
+    "reason": "Concise and accurate (12 words)"
+  },
+  {
+    "id": "W5",
+    "query": "What Docker containers does this stack run?",
+    "mode": "chat",
+    "category": "depth",
+    "workspace": "a",
+    "prompt_length": 20710,
+    "response": "This stack runs the following Docker containers:  \n- qdrant-6333 (Qdrant vector database on port 6333)  \n- mcp-gateway (MCP gateway service)  \n- 9 MCP tool containers (including Desktop Commander, Filesystem, Tavily, Fetch, Playwright, etc.)  \n\nThese are confirmed via `docker ps` output (per Desktop Commander).",
+    "word_count": 43,
+    "grade": "FAIL",
+    "reason": "Contains bullet lists"
+  }
+]

@@ -9,7 +9,7 @@ Key features:
 - Graceful degradation: never crash the MCP server on agent failures
 - Timeout handling: prevent hung agents from blocking the swarm
 - JSON repair: handle malformed LLM outputs without raising exceptions
-- Convergence detection: identify when agents reach stable outputs (>95% similarity)
+- Convergence detection: identify when agents reach stable outputs (>80% similarity)
 - Stalling detection: catch agents producing identical outputs across rounds
 - Re-delegation recommendations: suggest modified prompts for underperforming agents
 
@@ -22,9 +22,37 @@ import asyncio
 import difflib
 import json
 import logging
+import random
+from dataclasses import dataclass
 from typing import Any
 
 logger = logging.getLogger("dytopo.governance")
+
+_metrics_lock = asyncio.Lock()
+
+
+@dataclass
+class BackendRetryPolicy:
+    """Backend-aware retry configuration."""
+    max_retries: int = 3
+    base_delay: float = 1.0   # seconds
+    max_delay: float = 8.0    # seconds
+    jitter: bool = True
+
+    @classmethod
+    def for_backend(cls, backend: str = "llama-cpp") -> "BackendRetryPolicy":
+        """Get retry policy for the inference backend.
+
+        Short backoff (0.5-2s) optimized for parallel-safe operation.
+        """
+        return cls(max_retries=3, base_delay=0.5, max_delay=2.0, jitter=True)
+
+    def calculate_delay(self, attempt: int) -> float:
+        """Calculate backoff delay for given attempt number."""
+        delay = min(self.base_delay * (2 ** attempt), self.max_delay)
+        if self.jitter:
+            delay *= (0.5 + random.random())
+        return delay
 
 
 def _get_work(output: Any) -> str:
@@ -46,6 +74,7 @@ async def execute_agent_safe(
     agent_call_coro: Any,
     timeout_sec: float = 120.0,
     max_retries: int = 2,
+    backend: str = "llama-cpp",
 ) -> dict[str, Any]:
     """
     Execute an agent with retry logic and graceful failure handling.
@@ -132,7 +161,10 @@ async def execute_agent_safe(
 
         # Don't retry on last attempt
         if attempt < max_retries:
-            await asyncio.sleep(0.5 * (attempt + 1))  # Exponential backoff
+            policy = BackendRetryPolicy.for_backend(backend)
+            backoff_delay = policy.calculate_delay(attempt)
+            logger.debug(f"Agent {agent_id} retry {attempt + 1} after {backoff_delay:.2f}s")
+            await asyncio.sleep(backoff_delay)
 
     # All retries exhausted - return failure stub
     logger.error(f"Agent {agent_id} failed after {max_retries + 1} attempts: {last_error}")
@@ -196,19 +228,19 @@ def _safe_json_parse(text: str) -> dict[str, Any]:
 def detect_convergence(
     round_history: list[dict[str, Any]],
     window_size: int = 3,
-    similarity_threshold: float = 0.95,
+    similarity_threshold: float = 0.80,
 ) -> tuple[bool, float]:
     """
     Detect if swarm outputs have converged (stopped changing).
 
     Compares the last `window_size` rounds and checks if the outputs are
-    highly similar (>95% by default). Convergence suggests the swarm has
+    highly similar (>80% by default). Convergence suggests the swarm has
     reached a stable solution or is stuck.
 
     Args:
         round_history: List of round records, each with 'outputs' dict
         window_size: Number of recent rounds to compare (default: 3)
-        similarity_threshold: Minimum similarity to consider converged (default: 0.95)
+        similarity_threshold: Minimum similarity to consider converged (default: 0.80)
 
     Returns:
         Tuple of (is_converged: bool, avg_similarity: float)
@@ -508,12 +540,13 @@ def _check_agent_connectivity(agent_id: str, round_history: list[dict[str, Any]]
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 
-def update_agent_metrics(
+async def update_agent_metrics(
     agent_state: dict[str, Any],
     round_result: dict[str, Any],
 ) -> None:
-    """
-    Update agent state with metrics from a round execution.
+    """Update agent state with metrics from a round execution (thread-safe).
+
+    NOTE: Changed to async to support locking for concurrent updates.
 
     Modifies agent_state in-place to track:
     - Total rounds participated
@@ -528,30 +561,31 @@ def update_agent_metrics(
     Example:
         >>> agent_state = {"id": "developer", "failure_count": 0, "metrics": {}}
         >>> round_result = {"success": False, "retries": 2, "error": "Timeout"}
-        >>> update_agent_metrics(agent_state, round_result)
+        >>> await update_agent_metrics(agent_state, round_result)
         >>> print(agent_state["failure_count"])
         1
     """
-    # Initialize metrics if not present
-    if "metrics" not in agent_state:
-        agent_state["metrics"] = {}
+    async with _metrics_lock:
+        # Initialize metrics if not present
+        if "metrics" not in agent_state:
+            agent_state["metrics"] = {}
 
-    metrics = agent_state["metrics"]
+        metrics = agent_state["metrics"]
 
-    # Initialize counters
-    metrics.setdefault("total_rounds", 0)
-    metrics.setdefault("total_failures", 0)
-    metrics.setdefault("total_retries", 0)
+        # Initialize counters
+        metrics.setdefault("total_rounds", 0)
+        metrics.setdefault("total_failures", 0)
+        metrics.setdefault("total_retries", 0)
 
-    # Update counters
-    metrics["total_rounds"] += 1
+        # Update counters
+        metrics["total_rounds"] += 1
 
-    if not round_result.get("success", True):
-        metrics["total_failures"] += 1
-        agent_state["failure_count"] = agent_state.get("failure_count", 0) + 1
+        if not round_result.get("success", True):
+            metrics["total_failures"] += 1
+            agent_state["failure_count"] = agent_state.get("failure_count", 0) + 1
 
-    if "retries" in round_result:
-        metrics["total_retries"] += round_result["retries"]
+        if "retries" in round_result:
+            metrics["total_retries"] += round_result["retries"]
 
-    # Compute failure rate
-    metrics["failure_rate"] = metrics["total_failures"] / max(1, metrics["total_rounds"])
+        # Compute failure rate
+        metrics["failure_rate"] = metrics["total_failures"] / max(1, metrics["total_rounds"])

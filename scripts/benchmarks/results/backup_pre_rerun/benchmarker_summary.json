@@ -1,0 +1,134 @@
+{
+  "1": {
+    "name": "Explanation Tier",
+    "status": "OK",
+    "score": "0/5",
+    "passed": 0,
+    "total": 5,
+    "graded": true,
+    "failures": [
+      {
+        "id": "E1",
+        "reason": "Over word limit: 249 words (max 150)",
+        "words": 249
+      },
+      {
+        "id": "E2",
+        "reason": "Over word limit: 281 words (max 150)",
+        "words": 281
+      },
+      {
+        "id": "E3",
+        "reason": "Over word limit: 175 words (max 150)",
+        "words": 175
+      },
+      {
+        "id": "E4",
+        "reason": "Over word limit: 367 words (max 150)",
+        "words": 367
+      },
+      {
+        "id": "E5",
+        "reason": "Over word limit: 205 words (max 150)",
+        "words": 205
+      }
+    ]
+  },
+  "2": {
+    "name": "Adversarial Fabrication",
+    "status": "OK",
+    "score": "5/5",
+    "passed": 5,
+    "total": 5,
+    "graded": true
+  },
+  "3": {
+    "name": "Cross-Workspace Parity",
+    "status": "OK",
+    "score": "4/5",
+    "passed": 4,
+    "total": 5,
+    "graded": true,
+    "failures": [
+      {
+        "id": "W1",
+        "reason": "Fabricated financial data: price=True, fin_url=True",
+        "words": 31
+      }
+    ]
+  },
+  "4": {
+    "name": "Depth Stability",
+    "status": "OK",
+    "score": "8/8 deterministic",
+    "passed": 8,
+    "total": 8,
+    "graded": false,
+    "details": {
+      "D3": {
+        "avg": 412.0,
+        "spread": 0,
+        "verdict": "Deterministic"
+      },
+      "D4": {
+        "avg": 252.0,
+        "spread": 0,
+        "verdict": "Deterministic"
+      },
+      "D5": {
+        "avg": 150.0,
+        "spread": 0,
+        "verdict": "Deterministic"
+      },
+      "D6": {
+        "avg": 22.0,
+        "spread": 0,
+        "verdict": "Deterministic"
+      },
+      "D7": {
+        "avg": 210.0,
+        "spread": 0,
+        "verdict": "Deterministic"
+      },
+      "D8": {
+        "avg": 233.0,
+        "spread": 0,
+        "verdict": "Deterministic"
+      },
+      "D9": {
+        "avg": 206.0,
+        "spread": 0,
+        "verdict": "Deterministic"
+      },
+      "D10": {
+        "avg": 270.3,
+        "spread": 14,
+        "verdict": "Deterministic"
+      }
+    }
+  },
+  "5": {
+    "name": "LM Studio Validation",
+    "status": "OK",
+    "score": "5/5",
+    "passed": 5,
+    "total": 5,
+    "graded": true
+  },
+  "6": {
+    "name": "Showcase Gallery",
+    "status": "OK",
+    "score": "7 collected",
+    "graded": false,
+    "total": 7,
+    "word_counts": {
+      "S1": 45,
+      "S2": 16,
+      "S3": 42,
+      "S4": 471,
+      "S5": 257,
+      "S6": 32,
+      "S7": 56
+    }
+  }
+}

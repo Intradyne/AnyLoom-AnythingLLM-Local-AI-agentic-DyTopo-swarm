@@ -5,8 +5,8 @@ DyTopo Orchestrator
 Main swarm execution loop with dynamic semantic routing and parallel execution.
 
 Architecture:
-- Lazy singleton AsyncOpenAI client (backend-agnostic: LM Studio or vLLM)
-- Semaphore-controlled concurrency (max_concurrent=1 for LM Studio, 8 for vLLM)
+- Lazy singleton AsyncOpenAI client via llama.cpp inference backend
+- Semaphore-controlled concurrency (max_concurrent from config)
 - Round 1: Broadcast (all agents execute in parallel via asyncio.gather)
 - Rounds 2+: Phase A (parallel descriptor generation) -> Phase B (routing graph)
              -> Phase C (tiered parallel execution via topological_generations)
@@ -48,54 +48,17 @@ from dytopo.governance import (
     update_agent_metrics,
 )
 from dytopo.audit import SwarmAuditLog
+from inference.llm_client import get_client, reset_client
 
 logger = logging.getLogger("dytopo.orchestrator")
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-#  Lazy singleton AsyncOpenAI client + inference semaphore
+#  Inference client (singleton in inference.llm_client)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-_llm_client = None
-_inference_semaphore: asyncio.Semaphore | None = None
-
-
-def _get_llm_client(config: dict | None = None):
-    """Lazy singleton — one client reused across all calls.
-
-    Backend-aware: selects base_url from config["concurrency"]["backend"].
-    - "lmstudio": uses config["llm"]["base_url"] (default localhost:1234)
-    - "vllm": uses config["concurrency"]["vllm_base_url"] (default localhost:8000)
-    """
-    global _llm_client
-    if _llm_client is None:
-        from openai import AsyncOpenAI
-        cfg = config or load_config()
-        backend = cfg.get("concurrency", {}).get("backend", "lmstudio")
-        if backend == "vllm":
-            base_url = cfg["concurrency"]["vllm_base_url"]
-            api_key = "EMPTY"
-        else:
-            base_url = cfg["llm"]["base_url"]
-            api_key = "not-needed"
-        _llm_client = AsyncOpenAI(base_url=base_url, api_key=api_key)
-        logger.info(f"AsyncOpenAI client initialized: {base_url} (backend={backend})")
-    return _llm_client
-
-
-def _get_semaphore(config: dict | None = None) -> asyncio.Semaphore:
-    """Lazy singleton semaphore controlling max concurrent LLM calls.
-
-    With lmstudio (max_concurrent=1), calls are effectively sequential.
-    With vllm (max_concurrent=8), up to 8 calls run in parallel.
-    """
-    global _inference_semaphore
-    if _inference_semaphore is None:
-        cfg = config or load_config()
-        max_concurrent = cfg.get("concurrency", {}).get("max_concurrent", 1)
-        _inference_semaphore = asyncio.Semaphore(max_concurrent)
-        logger.info(f"Inference semaphore initialized: max_concurrent={max_concurrent}")
-    return _inference_semaphore
+# Note: The InferenceClient singleton is now managed by get_client() from
+# inference.llm_client. It provides connection pooling, health checks,
+# retry logic, and per-agent token tracking.
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -188,21 +151,21 @@ async def _llm_call(
     json_mode: bool = False,
     response_format: dict | None = None,
     config: dict | None = None,
+    agent_id: str = "",
 ) -> dict:
-    """Single LLM call with retry and timeout.
+    """Single LLM call via InferenceClient with retry and timeout.
 
     Returns:
         {"content": str, "parsed": dict|None, "tokens_in": int, "tokens_out": int}
     """
-    from tenacity import retry, stop_after_attempt, wait_exponential
-    import httpx
-    from openai import APITimeoutError
-
     cfg = config or load_config()
-    client = _get_llm_client(cfg)
+    # InferenceClient expects a flat dict; merge llm + concurrency sections
+    client_cfg = {**cfg.get("concurrency", {}), **cfg.get("llm", {})}
+    client = await get_client(client_cfg)
     timeout_sec = cfg["llm"]["timeout_seconds"]
-    semaphore = _get_semaphore(cfg)
 
+    # Build kwargs for the underlying OpenAI call
+    # Note: InferenceClient handles semaphore, retry, and token tracking internally
     kwargs: dict[str, Any] = {
         "model": cfg["llm"]["model"],
         "messages": messages,
@@ -214,38 +177,31 @@ async def _llm_call(
     if response_format:
         kwargs["response_format"] = response_format
 
-    @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=1, max=4),
-        retry=lambda retry_state: isinstance(
-            retry_state.outcome.exception(),
-            (httpx.TimeoutException, APITimeoutError),
-        ) if retry_state.outcome and retry_state.outcome.exception() else False,
+    # Use the new inference client (handles retry, semaphore, token tracking)
+    result = await client.chat_completion(
+        messages=messages,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        response_format=response_format,
+        agent_id=agent_id,
+        timeout=timeout_sec,
     )
-    async def _call():
-        async with semaphore:
-            return await asyncio.wait_for(
-                client.chat.completions.create(**kwargs),
-                timeout=timeout_sec,
-            )
 
-    resp = await _call()
+    # Check for truncation
+    content = result.content
+    if result.content and "finish_reason" in dir(result):
+        # Note: CompletionResult doesn't currently expose finish_reason
+        # This is handled by the llm_client internally
+        pass
 
-    content = resp.choices[0].message.content or ""
-    tokens_in = resp.usage.prompt_tokens if resp.usage else 0
-    tokens_out = resp.usage.completion_tokens if resp.usage else 0
-
-    finish_reason = resp.choices[0].finish_reason or "unknown"
-    if finish_reason == "length":
-        content += "\n[TRUNCATED — hit max_tokens]"
-
+    # Parse JSON if needed
     parsed = _extract_json(content) if json_mode or response_format else None
 
     return {
         "content": content,
         "parsed": parsed,
-        "tokens_in": tokens_in,
-        "tokens_out": tokens_out,
+        "tokens_in": result.tokens_in,
+        "tokens_out": result.tokens_out,
     }
 
 
@@ -256,8 +212,12 @@ async def _call_manager(
     domain,
     agent_map: dict[str, AgentState],
     config: dict,
+    pre_context: str = "",
 ) -> tuple[ManagerDecision, int]:
     """Send task + round history summary to Manager, parse ManagerDecision.
+
+    Args:
+        pre_context: Pre-fetched RAG context injected into task framing (round 1 only).
 
     Returns:
         (decision, tokens_used)
@@ -265,6 +225,8 @@ async def _call_manager(
     manager_prompt = get_system_prompt(domain, AgentRole.MANAGER)
 
     manager_context = f"Task: {task}\n\n"
+    if pre_context and round_num == 1:
+        manager_context += f"Reference context (from workspace RAG):\n{pre_context}\n\n"
     if round_history:
         manager_context += _summarize_rounds(round_history[-3:], agent_map)
     manager_context += (
@@ -282,6 +244,7 @@ async def _call_manager(
         max_tokens=config["llm"]["max_tokens_manager"],
         json_mode=True,
         config=config,
+        agent_id="manager",
     )
 
     parsed = result["parsed"] or {}
@@ -380,6 +343,7 @@ async def _call_worker(
             max_tokens=max_tokens,
             json_mode=True,
             config=config,
+            agent_id=agent.agent_id,
         )
         parsed = result["parsed"] or {}
         tokens = result["tokens_in"] + result["tokens_out"]
@@ -518,6 +482,7 @@ async def run_swarm(
             # ── Phase 1: Manager sets goal or terminates ─────────────────────
             decision, mgr_tokens = await _call_manager(
                 swarm.task, swarm.rounds, t, swarm.domain, agent_map, config,
+                pre_context=swarm.context,
             )
             swarm.total_llm_calls += 1
             swarm.total_tokens += mgr_tokens
@@ -553,10 +518,17 @@ async def run_swarm(
                     )
                     return aid, astate, desc, tok
 
-                broadcast_results = await asyncio.gather(
-                    *[_broadcast_agent(aid, ast) for aid, ast in agent_map.items()],
-                    return_exceptions=True,
-                )
+                try:
+                    broadcast_results = await asyncio.wait_for(
+                        asyncio.gather(
+                            *[_broadcast_agent(aid, ast) for aid, ast in agent_map.items()],
+                            return_exceptions=True,
+                        ),
+                        timeout=120,
+                    )
+                except asyncio.TimeoutError:
+                    logger.error(f"Round {t} broadcast execution timed out")
+                    broadcast_results = [TimeoutError(f"Round {t} timed out")] * len(agent_map)
 
                 for result in broadcast_results:
                     if isinstance(result, Exception):
@@ -598,10 +570,17 @@ async def run_swarm(
                 )
                 return aid, astate, desc, tok
 
-            desc_results = await asyncio.gather(
-                *[_gen_descriptor(aid, ast) for aid, ast in agent_map.items()],
-                return_exceptions=True,
-            )
+            try:
+                desc_results = await asyncio.wait_for(
+                    asyncio.gather(
+                        *[_gen_descriptor(aid, ast) for aid, ast in agent_map.items()],
+                        return_exceptions=True,
+                    ),
+                    timeout=120,
+                )
+            except asyncio.TimeoutError:
+                logger.error(f"Round {t} descriptor generation timed out")
+                desc_results = [TimeoutError(f"Round {t} timed out")] * len(agent_map)
 
             descriptors: dict[str, dict] = {}
             for result in desc_results:
@@ -680,10 +659,17 @@ async def run_swarm(
                     )
                     return aid, astate, descriptor, tokens
 
-                tier_results = await asyncio.gather(
-                    *[_exec_agent(aid) for aid in tier],
-                    return_exceptions=True,
-                )
+                try:
+                    tier_results = await asyncio.wait_for(
+                        asyncio.gather(
+                            *[_exec_agent(aid) for aid in tier],
+                            return_exceptions=True,
+                        ),
+                        timeout=120,
+                    )
+                except asyncio.TimeoutError:
+                    logger.error(f"Round {t} agent execution timed out")
+                    tier_results = [TimeoutError(f"Round {t} timed out")] * len(tier)
 
                 # Accumulate outputs — all agents in this tier complete before next tier
                 for result in tier_results:

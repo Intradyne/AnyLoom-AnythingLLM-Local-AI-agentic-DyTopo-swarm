@@ -1,0 +1,114 @@
+{
+  "1": {
+    "name": "Explanation Tier",
+    "status": "OK",
+    "score": "4/5",
+    "passed": 4,
+    "total": 5,
+    "graded": true,
+    "failures": [
+      {
+        "id": "E1",
+        "reason": "Missing port numbers",
+        "words": 141
+      }
+    ]
+  },
+  "2": {
+    "name": "Adversarial Fabrication",
+    "status": "OK",
+    "score": "5/5",
+    "passed": 5,
+    "total": 5,
+    "graded": true
+  },
+  "3": {
+    "name": "Cross-Workspace Parity",
+    "status": "OK",
+    "score": "5/5",
+    "passed": 5,
+    "total": 5,
+    "graded": true
+  },
+  "4": {
+    "name": "Depth Stability",
+    "status": "OK",
+    "score": "8/8 deterministic",
+    "passed": 8,
+    "total": 8,
+    "graded": false,
+    "details": {
+      "D3": {
+        "avg": 209.0,
+        "spread": 0,
+        "verdict": "Deterministic"
+      },
+      "D4": {
+        "avg": 100.0,
+        "spread": 0,
+        "verdict": "Deterministic"
+      },
+      "D5": {
+        "avg": 88.0,
+        "spread": 0,
+        "verdict": "Deterministic"
+      },
+      "D6": {
+        "avg": 63.0,
+        "spread": 0,
+        "verdict": "Deterministic"
+      },
+      "D7": {
+        "avg": 145.0,
+        "spread": 0,
+        "verdict": "Deterministic"
+      },
+      "D8": {
+        "avg": 213.0,
+        "spread": 0,
+        "verdict": "Deterministic"
+      },
+      "D9": {
+        "avg": 337.0,
+        "spread": 0,
+        "verdict": "Deterministic"
+      },
+      "D10": {
+        "avg": 249.0,
+        "spread": 0,
+        "verdict": "Deterministic"
+      }
+    }
+  },
+  "5": {
+    "name": "LLM Direct Validation",
+    "status": "OK",
+    "score": "4/5",
+    "passed": 4,
+    "total": 5,
+    "graded": true,
+    "failures": [
+      {
+        "id": "L5",
+        "reason": "Did not identify that web search requires tools",
+        "words": 15
+      }
+    ]
+  },
+  "6": {
+    "name": "Showcase Gallery",
+    "status": "OK",
+    "score": "7 collected",
+    "graded": false,
+    "total": 7,
+    "word_counts": {
+      "S1": 40,
+      "S2": 16,
+      "S3": 1,
+      "S4": 452,
+      "S5": 250,
+      "S6": 108,
+      "S7": 199
+    }
+  }
+}

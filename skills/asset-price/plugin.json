@@ -1,0 +1,27 @@
+{
+  "active": true,
+  "hubId": "asset-price",
+  "name": "Asset Price Lookup",
+  "schema": "skill-1.0.0",
+  "version": "1.0.0",
+  "description": "Fetches current market prices for stocks, cryptocurrencies, commodities (gold, silver, oil), indices (S&P 500, Nasdaq, Dow), and ETFs. Accepts ticker symbols or common names.",
+  "author": "@anyloom",
+  "license": "MIT",
+  "setup_args": {},
+  "examples": [
+    {"prompt": "What is the current price of silver?", "call": "{\"query\": \"silver\"}"},
+    {"prompt": "How much is AAPL stock right now?", "call": "{\"query\": \"AAPL\"}"},
+    {"prompt": "What's the bitcoin price?", "call": "{\"query\": \"bitcoin\"}"},
+    {"prompt": "Show me the S&P 500 index", "call": "{\"query\": \"S&P 500\"}"}
+  ],
+  "entrypoint": {
+    "file": "handler.js",
+    "params": {
+      "query": {
+        "description": "Ticker symbol (AAPL, BTC-USD, GC=F) or common name (silver, bitcoin, S&P 500)",
+        "type": "string"
+      }
+    }
+  },
+  "imported": false
+}

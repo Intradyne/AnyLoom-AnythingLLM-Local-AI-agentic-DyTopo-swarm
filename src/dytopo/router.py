@@ -5,7 +5,7 @@ DyTopo Semantic Router
 Embedding, similarity matrix computation, thresholding, and degree cap enforcement.
 
 Key constraint: Uses MiniLM-L6-v2 (22M params, 384-dim) on CPU.
-BGE-M3 (used for RAG) is NOT used for routing.
+Tiny model (~80 MB), not worth GPU overhead.  BGE-M3 (used for RAG) is NOT used for routing.
 """
 
 import json
@@ -22,12 +22,12 @@ _routing_model = None
 
 
 def _get_routing_model():
-    """Lazy-load MiniLM-L6-v2 for descriptor embedding. ~80 MB RAM, <1s load."""
+    """Lazy-load MiniLM-L6-v2 for descriptor embedding. CPU — tiny model, not worth GPU."""
     global _routing_model
     if _routing_model is None:
         from sentence_transformers import SentenceTransformer
         _routing_model = SentenceTransformer("all-MiniLM-L6-v2", device="cpu")
-        logger.info("MiniLM-L6-v2 loaded for DyTopo routing (~80 MB)")
+        logger.info("MiniLM-L6-v2 loaded for DyTopo routing on CPU (~80 MB)")
     return _routing_model
 
 
@@ -95,7 +95,7 @@ def apply_threshold(
 
     Args:
         S: Similarity matrix, shape (N, N)
-        tau: Threshold value (typically 0.3)
+        tau: Threshold value (typically 0.5 for MiniLM on well-crafted descriptors)
 
     Returns:
         Adjacency matrix A, shape (N, N), dtype int32

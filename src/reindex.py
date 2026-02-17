@@ -1,6 +1,6 @@
-"""Standalone re-embed script for port 6334 (LM Studio hybrid RAG).
+"""Standalone re-embed script for Qdrant hybrid RAG.
 
-Reads .md files from both RAG doc directories, chunks on ## headers,
+Reads .md files from RAG doc directories, chunks on ## headers,
 embeds with BGE-M3 (dense + sparse), and upserts to Qdrant.
 
 Usage:
@@ -17,12 +17,11 @@ import uuid
 from pathlib import Path
 
 # ── Config ────────────────────────────────────────────────────────────────────
-QDRANT_URL = os.environ.get("QDRANT_URL", "http://localhost:6334")
-COLLECTION = os.environ.get("COLLECTION_NAME", "lmstudio_docs")
+QDRANT_URL = os.environ.get("QDRANT_URL", "http://localhost:6333")
+COLLECTION = os.environ.get("COLLECTION_NAME", "anyloom_docs")
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 DOC_SOURCES = {
-    "lmstudio": PROJECT_ROOT / "rag-docs" / "lm-studio",
     "anythingllm": PROJECT_ROOT / "rag-docs" / "anythingllm",
 }
 
@@ -90,26 +89,60 @@ async def main():
 
     print(f"\nTotal: {len(all_chunks)} chunks to embed")
 
-    # 2. Load BGE-M3
-    print("\nLoading BGE-M3 embedder (CPU, first load may download ~2.3 GB)...")
-    import torch
-    torch.set_grad_enabled(False)
-    from FlagEmbedding import BGEM3FlagModel
-    model = BGEM3FlagModel("BAAI/bge-m3", device="cpu", use_fp16=False)
-    torch.set_num_threads(CPU_THREADS)
-    print("BGE-M3 loaded.")
+    # 2. Load BGE-M3 (ONNX INT8 on CPU — AVX-512 VNNI optimized)
+    import onnxruntime as ort
+    from sentence_transformers import SentenceTransformer
 
-    # 3. Embed all chunks
+    print("\nLoading BGE-M3 ONNX INT8 on CPU...")
+    sess_options = ort.SessionOptions()
+    sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+    sess_options.intra_op_num_threads = CPU_THREADS
+    sess_options.inter_op_num_threads = 2
+    sess_options.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+    model = SentenceTransformer(
+        "BAAI/bge-m3",
+        backend="onnx",
+        model_kwargs={"provider": "CPUExecutionProvider", "session_options": sess_options},
+    )
+    print(f"BGE-M3 ONNX INT8 loaded ({CPU_THREADS} threads).")
+
+    # 3. Embed all chunks (dense via ONNX + TF-based sparse for lexical matching)
+    import binascii
+    import math
+    from collections import Counter
+
+    _STOP_WORDS = frozenset({
+        "a", "an", "the", "and", "or", "but", "in", "on", "at", "to", "for",
+        "of", "with", "by", "from", "is", "it", "as", "be", "was", "are",
+        "this", "that", "not", "no", "do", "if", "so", "up", "we", "he",
+        "she", "my", "me", "our", "you", "its", "has", "had", "have", "can",
+    })
+    _TOKEN_RE = re.compile(r"[a-z0-9]{2,}")
+
+    def _text_to_sparse(text):
+        tokens = _TOKEN_RE.findall(text.lower())
+        tokens = [t for t in tokens if t not in _STOP_WORDS]
+        if not tokens:
+            return {}
+        counts = Counter(tokens)
+        sparse = {}
+        for token, count in counts.items():
+            token_id = binascii.crc32(token.encode()) & 0x7FFFFFFF
+            weight = 1.0 + math.log(count)
+            if token_id not in sparse or sparse[token_id] < weight:
+                sparse[token_id] = weight
+        return sparse
+
     texts = [c["text"] for c in all_chunks]
     print(f"\nEmbedding {len(texts)} chunks (batch_size={EMBED_BATCH_SIZE}, max_length={EMBED_MAX_LENGTH})...")
-    output = model.encode(
+    dense_vecs = model.encode(
         texts,
-        return_dense=True,
-        return_sparse=True,
-        return_colbert_vecs=False,
-        max_length=EMBED_MAX_LENGTH,
         batch_size=EMBED_BATCH_SIZE,
+        normalize_embeddings=True,
+        show_progress_bar=True,
     )
+    sparse_weights = [_text_to_sparse(t) for t in texts]
+    output = {"dense_vecs": dense_vecs, "lexical_weights": sparse_weights}
     print("Embedding complete.")
 
     # 4. Connect to Qdrant and recreate collection
@@ -154,12 +187,12 @@ async def main():
             chunk["source_dir"], chunk["source"],
             chunk["section_header"], chunk["chunk_index"],
         )
+        vectors = {"dense": dense_vec}
+        if sparse_indices:
+            vectors["sparse"] = models.SparseVector(indices=sparse_indices, values=sparse_values)
         points.append(models.PointStruct(
             id=point_id,
-            vector={
-                "dense": dense_vec,
-                "sparse": models.SparseVector(indices=sparse_indices, values=sparse_values),
-            },
+            vector=vectors,
             payload={
                 "content": chunk["text"],
                 "source": chunk["source"],
@@ -178,7 +211,7 @@ async def main():
         print(f"  Batch {start // BATCH + 1}: {len(batch)} points")
 
     # 6. Save state file (compatible with MCP server's incremental sync)
-    state_file = DOC_SOURCES["lmstudio"] / ".rag_state.json"
+    state_file = DOC_SOURCES["anythingllm"] / ".rag_state.json"
     state = {}
     for label, dir_path in DOC_SOURCES.items():
         if dir_path.exists():

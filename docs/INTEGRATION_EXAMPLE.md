@@ -66,7 +66,7 @@ Override defaults via `dytopo_config.yaml` in the project root:
 
 ```yaml
 llm:
-  base_url: "http://localhost:1234/v1"
+  base_url: "http://localhost:8008/v1"
   model: "qwen3-30b-a3b-instruct-2507"
   temperature_work: 0.3
   temperature_descriptor: 0.1

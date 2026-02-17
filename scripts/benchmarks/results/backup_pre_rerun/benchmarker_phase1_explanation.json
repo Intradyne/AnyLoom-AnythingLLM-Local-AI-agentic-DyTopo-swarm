@@ -1,0 +1,57 @@
+[
+  {
+    "id": "E1",
+    "query": "How do the two RAG pipelines differ?",
+    "mode": "query",
+    "response": "There is no relevant information in this workspace to answer your query.",
+    "word_count": 12,
+    "grade": "FAIL",
+    "reason": "Under word minimum: 12 words (min 30); Missing port numbers; Missing dense/hybrid distinction",
+    "has_headers": false,
+    "has_bullets": false
+  },
+  {
+    "id": "E2",
+    "query": "How does DyTopo route messages between agents?",
+    "mode": "query",
+    "response": "There is no relevant information in this workspace to answer your query.",
+    "word_count": 12,
+    "grade": "FAIL",
+    "reason": "Under word minimum: 12 words (min 30); Missing DyTopo routing mechanism",
+    "has_headers": false,
+    "has_bullets": false
+  },
+  {
+    "id": "E3",
+    "query": "What's the difference between chat mode and query mode in AnythingLLM?",
+    "mode": "query",
+    "response": "There is no relevant information in this workspace to answer your query.",
+    "word_count": 12,
+    "grade": "FAIL",
+    "reason": "Under word minimum: 12 words (min 30); Missing history/no-history distinction",
+    "has_headers": false,
+    "has_bullets": false
+  },
+  {
+    "id": "E4",
+    "query": "How does hybrid search with RRF work compared to dense-only search?",
+    "mode": "query",
+    "response": "There is no relevant information in this workspace to answer your query.",
+    "word_count": 12,
+    "grade": "FAIL",
+    "reason": "Under word minimum: 12 words (min 30); Missing RRF concept",
+    "has_headers": false,
+    "has_bullets": false
+  },
+  {
+    "id": "E5",
+    "query": "How does AnythingLLM inject RAG context into a query?",
+    "mode": "query",
+    "response": "There is no relevant information in this workspace to answer your query.",
+    "word_count": 12,
+    "grade": "FAIL",
+    "reason": "Under word minimum: 12 words (min 30); Missing context injection mechanism; Missing automatic/passive nature of injection",
+    "has_headers": false,
+    "has_bullets": false
+  }
+]

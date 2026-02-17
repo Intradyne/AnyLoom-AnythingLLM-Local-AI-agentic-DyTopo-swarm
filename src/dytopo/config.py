@@ -14,11 +14,11 @@ import yaml
 
 _DEFAULTS = {
     "llm": {
-        "base_url": "http://localhost:1234/v1",
+        "base_url": "http://localhost:8008/v1",
         "model": "qwen3-30b-a3b-instruct-2507",
-        "temperature_work": 0.3,
+        "temperature_work": 0.7,
         "temperature_descriptor": 0.1,
-        "temperature_manager": 0.1,
+        "temperature_manager": 0.3,
         "max_tokens_work": 4096,
         "max_tokens_descriptor": 256,
         "max_tokens_manager": 2000,
@@ -26,7 +26,7 @@ _DEFAULTS = {
     },
     "routing": {
         "embedding_model": "all-MiniLM-L6-v2",
-        "tau": 0.3,
+        "tau": 0.5,
         "K_in": 3,
         "adaptive_tau": False,
         "broadcast_round_1": True,
@@ -35,8 +35,9 @@ _DEFAULTS = {
         "T_max": 5,
         "descriptor_mode": "combined",
         "state_strategy": "full",
-        "convergence_threshold": 0.9,
+        "convergence_threshold": 0.80,
         "fallback_on_isolation": True,
+        "max_agent_context_tokens": 32768,
     },
     "logging": {
         "log_dir": "~/dytopo-logs",
@@ -45,9 +46,9 @@ _DEFAULTS = {
         "console_verbosity": "info",
     },
     "concurrency": {
-        "backend": "lmstudio",          # "lmstudio" or "vllm"
-        "max_concurrent": 1,            # 1 for lmstudio (sequential), 8 for vllm
-        "vllm_base_url": "http://localhost:8000/v1",
+        "backend": "llama-cpp",
+        "max_concurrent": 2,
+        "llm_base_url": "http://localhost:8008/v1",
         "connect_timeout": 10.0,
         "read_timeout": 180.0,
     },

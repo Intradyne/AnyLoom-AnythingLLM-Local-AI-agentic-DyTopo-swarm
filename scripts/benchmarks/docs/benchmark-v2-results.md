@@ -1,6 +1,10 @@
 # Benchmark V2 Results
+
+> **Engine:** llama.cpp with Qwen3-30B-A3B Q4_K_M GGUF, 131K context.
+> These results were originally collected on vLLM with Q6_K. The stack has since migrated to llama.cpp.
+
 **Date:** 2026-02-14
-**Model:** Qwen3-30B-A3B-Instruct-2507 (Q6_K)
+**Model:** Qwen3-30B-A3B-Instruct-2507 (Q4_K_M GGUF)
 **Tester:** Claude Code via AnythingLLM REST API
 **Workspace:** c (slug: c, id: 14)
 
@@ -43,16 +47,18 @@ Root cause: These are technical concepts with 5-6 tier enumeration (D3) or a mul
 
 **Recommendation:** Keep topN = 15 (current value). The depth calibration is driven entirely by the system prompt examples, not by the number of injected RAG chunks. Reducing topN would only risk losing relevant context for complex queries without any conciseness benefit.
 
-## Phase 3: LM Studio Parity
+## Phase 3: LM Studio Parity (historical)
 
-4 edits applied to `prompts/lm-studio-system-prompt.md`:
+> **Note:** LM Studio has been replaced by vLLM. The file `prompts/lm-studio-system-prompt.md` no longer exists. These results are preserved for historical reference.
+
+4 edits were applied to the former `prompts/lm-studio-system-prompt.md`:
 
 1. **Tool-first price rule + negative example** — Added "Never output a dollar amount..." and BAD/GOOD pattern after forced-tool query list
 2. **Strengthened Lookup tier definition** — Added "what is X?" and "what is [component]?" patterns, explicit bans on headers/bullets/features
 3. **Two lookup examples** — Port 6333 lookup and DyTopo lookup with "That is the complete answer" reinforcement
 4. **Linked /no_think to Lookup tier** — Explicit instruction to use /no_think for Lookup-depth queries
 
-Remaining gaps: none. All AnythingLLM-specific fixes that apply to LM Studio's context have been ported.
+Remaining gaps: none. All AnythingLLM-specific fixes that applied to LM Studio's context were ported.
 
 ## Overall
 
@@ -60,10 +66,10 @@ Remaining gaps: none. All AnythingLLM-specific fixes that apply to LM Studio's c
 |-------|--------|
 | Phase 1 | 10/12 (8 PASS, 2 MARGINAL, 0 FAIL) |
 | Phase 2 | topN = 15 (no change — topN doesn't affect depth) |
-| Phase 3 | 4 edits applied to LM Studio prompt |
+| Phase 3 | 4 edits applied to LM Studio prompt (historical — LM Studio replaced by vLLM) |
 | Phase 4 | No conditional fixes needed |
 
 ### Action Items
 - **AnythingLLM prompt**: Already deployed, no changes needed
-- **LM Studio prompt**: Updated at `prompts/lm-studio-system-prompt.md` — copy contents into LM Studio's system prompt field to deploy
+- **LLM system prompt**: Current at `prompts/llm-system-prompt.md` — validated by Phase 5 (5/5 PASS on llama.cpp)
 - **topN**: Stays at 15, no API change needed

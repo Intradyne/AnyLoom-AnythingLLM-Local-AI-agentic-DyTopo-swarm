@@ -1,0 +1,47 @@
+[
+  {
+    "id": "L1",
+    "query": "What is DyTopo?",
+    "raw_response": "DyTopo is a Dynamic Topology multi-agent swarm system that launches specialized agent teams (code, math, general domains) to collaborate through semantically-routed message passing across multiple inference rounds.",
+    "stripped_response": "DyTopo is a Dynamic Topology multi-agent swarm system that launches specialized agent teams (code, math, general domains) to collaborate through semantically-routed message passing across multiple inference rounds.",
+    "word_count": 27,
+    "grade": "PASS",
+    "reason": "Compliant (27 words)"
+  },
+  {
+    "id": "L2",
+    "query": "What's the price of gold?",
+    "raw_response": "This requires a live data lookup — call Tavily first.",
+    "stripped_response": "This requires a live data lookup — call Tavily first.",
+    "word_count": 10,
+    "grade": "PASS",
+    "reason": "Compliant (10 words)"
+  },
+  {
+    "id": "L3",
+    "query": "What port does AnythingLLM's Qdrant run on?",
+    "raw_response": "AnythingLLM's Qdrant runs on port 6333, serving the hybrid workspace RAG with BGE-M3 embeddings (per rag_search on 01-architecture-reference).",
+    "stripped_response": "AnythingLLM's Qdrant runs on port 6333, serving the hybrid workspace RAG with BGE-M3 embeddings (per rag_search on 01-architecture-reference).",
+    "word_count": 18,
+    "grade": "PASS",
+    "reason": "Compliant (18 words)"
+  },
+  {
+    "id": "L4",
+    "query": "What is the trust hierarchy?",
+    "raw_response": "The trust hierarchy is a prioritized system for determining the reliability of information sources, ranked as follows: tool-verified facts > rag_search results > Memory graph > training knowledge. When sources conflict, the higher-ranked source is used, as it is more likely to be current and accurate. This includes dates—training knowledge may be outdated, but tool-verified data with a timestamp from today or recently is treated as the current fact.",
+    "stripped_response": "The trust hierarchy is a prioritized system for determining the reliability of information sources, ranked as follows: tool-verified facts > rag_search results > Memory graph > training knowledge. When sources conflict, the higher-ranked source is used, as it is more likely to be current and accurate. This includes dates—training knowledge may be outdated, but tool-verified data with a timestamp from today or recently is treated as the current fact.",
+    "word_count": 69,
+    "grade": "PASS",
+    "reason": "Compliant (69 words)"
+  },
+  {
+    "id": "L5",
+    "query": "Search the web for the latest Qdrant release notes",
+    "raw_response": "I'll search for the latest Qdrant release notes for you.\n\nrag_search(query=\"latest Qdrant release notes\", limit=5)",
+    "stripped_response": "I'll search for the latest Qdrant release notes for you.\n\nrag_search(query=\"latest Qdrant release notes\", limit=5)",
+    "word_count": 15,
+    "grade": "FAIL",
+    "reason": "Did not identify that web search requires tools"
+  }
+]

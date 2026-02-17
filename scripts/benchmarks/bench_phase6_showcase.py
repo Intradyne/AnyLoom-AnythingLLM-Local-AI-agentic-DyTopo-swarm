@@ -4,8 +4,10 @@ warnings.filterwarnings('ignore')
 sys.path.insert(0, os.path.dirname(__file__))
 import benchmark_helpers as bh
 
-API_KEY = "92JHT3J-PMF4SGA-GT0X50Y-RMGKDT3"
-SLUG = "c"
+API_KEY = os.environ.get("ANYTHINGLLM_API_KEY", "")
+SLUG = os.environ.get("ANYTHINGLLM_WORKSPACE", "anyloom")
+if not API_KEY:
+    print("Set ANYTHINGLLM_API_KEY env var first"); sys.exit(1)
 bh.init(API_KEY, SLUG)
 
 SHOWCASE_QUERIES = [
