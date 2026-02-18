@@ -31,10 +31,20 @@ module.exports.runtime = {
         });
       }
 
-      // --- Fetch the page ---
-      this.introspect(`Fetching web page: ${targetUrl}`);
+      // --- Strip fabricated Wikipedia anchor fragments ---
+      let fetchUrl = targetUrl;
+      if (targetUrl.includes("wikipedia.org") && targetUrl.includes("#")) {
+        const fragment = targetUrl.split("#")[1];
+        fetchUrl = targetUrl.split("#")[0];
+        this.introspect(
+          `Stripped anchor fragment "#${fragment}" — fetching base page instead.`
+        );
+      }
 
-      const response = await fetch(targetUrl, {
+      // --- Fetch the page ---
+      this.introspect(`Fetching web page: ${fetchUrl}`);
+
+      const response = await fetch(fetchUrl, {
         method: "GET",
         headers: {
           "User-Agent":
@@ -55,7 +65,7 @@ module.exports.runtime = {
             "Access forbidden. The site blocks automated requests. Try a different URL or use the built-in web-scraper.";
         } else if (statusCode === 404) {
           guidance +=
-            "Page not found. Check the URL for typos.";
+            "Page not found. This URL does not exist. Do NOT guess or fabricate alternative URLs. Instead, tell the user the page was not found, or use a web-search tool to find the correct URL.";
         } else if (statusCode === 429) {
           guidance +=
             "Too many requests. Wait a moment and try again.";
@@ -95,15 +105,27 @@ module.exports.runtime = {
       // Tier 1: Defuddle + JSDOM  (best quality)
       // ---------------------------------------------------------
       try {
-        const { Defuddle } = require("defuddle/node");
+        // Use root CJS export (defuddle/node is ESM-only, incompatible with Node 18 require())
+        const Defuddle = require("defuddle");
         const { JSDOM } = require("jsdom");
+        const TurndownService = require("turndown");
 
-        const dom = new JSDOM(html, { url: targetUrl });
-        const result = Defuddle.parse(dom.window.document);
+        const dom = new JSDOM(html, { url: fetchUrl });
+        const d = new Defuddle(dom.window.document);
+        // Suppress noisy CSS selector errors (e.g. MathJax selectors on Wikipedia)
+        const _origErr = console.error;
+        console.error = () => {};
+        let result;
+        try { result = d.parse(); } finally { console.error = _origErr; }
 
         if (result && result.content && result.content.trim().length > 0) {
           title = result.title || "";
-          content = result.content.trim();
+          // Root export returns HTML; convert to markdown via Turndown
+          const turndown = new TurndownService({
+            headingStyle: "atx",
+            codeBlockStyle: "fenced",
+          });
+          content = turndown.turndown(result.content).trim();
           extractionMethod = "defuddle";
           this.logger("smart-web-reader: extraction via Defuddle succeeded");
         }
@@ -122,7 +144,7 @@ module.exports.runtime = {
           const { JSDOM } = require("jsdom");
           const TurndownService = require("turndown");
 
-          const dom = new JSDOM(html, { url: targetUrl });
+          const dom = new JSDOM(html, { url: fetchUrl });
           const reader = new Readability(dom.window.document);
           const article = reader.parse();
 
@@ -215,6 +237,12 @@ module.exports.runtime = {
         `Extracted ${content.length} characters using ${extractionMethod}${title ? `: "${title}"` : ""}`
       );
 
+      // --- Content-relevance hint ---
+      const wordCount = content.split(/\s+/).length;
+      if (wordCount < 50) {
+        content = "[Page contained very little readable text. This may be the wrong page for your query.]";
+      }
+
       return JSON.stringify({
         status: "success",
         source: targetUrl,
@@ -222,6 +250,8 @@ module.exports.runtime = {
           title: title,
           content: content,
           url: targetUrl,
+          word_count: wordCount,
+          extraction_method: extractionMethod,
         },
       });
     } catch (err) {

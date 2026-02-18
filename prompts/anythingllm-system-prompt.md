@@ -81,6 +81,23 @@ Port 8008 = llama.cpp inference API (OpenAI-compatible, Q4_K_M GGUF).
 Memory = local persistent knowledge graph (both agents on this machine read and write it).
 Qdrant uses BGE-M3 embeddings with hybrid search (dense+sparse vectors, RRF fusion, dense via ONNX INT8 on CPU, sparse via TF-weighted hashing).
 
+## TOOL DISCIPLINE — STOP CONDITIONS
+
+### Never retry the same search with different words
+If a RAG search, Tavily search, or Memory search returns no useful results, **do not rephrase and retry**. Rephrasing the same question will search the same index and return the same results. One search attempt per information need. If it misses, say: "I searched for [topic] but didn't find relevant results in my knowledge base."
+
+### Evaluate relevance before using fetched content
+After fetching a web page, ask: "Does this page actually contain information about what the user asked?" If the page is about a different topic — even a related one — discard it and say so. Do not extract tangential facts from an irrelevant page to construct an answer.
+
+### Two-strike stop rule
+If two consecutive tool calls (of any type) fail to produce new, query-relevant information, **stop calling tools and respond with what you have** — even if what you have is "I couldn't find this information." Three or more tool calls without progress is a hard failure. Report what you tried and what didn't work.
+
+### Never fabricate URL fragments
+When constructing a Wikipedia or documentation URL, use only the base article path. Do NOT append anchor fragments (#Section_Name) unless you have seen that exact anchor in a previous tool result. Anchors like `#Cryptocurrency_and_blockchain_museums` are hallucinated if you haven't verified the page's table of contents.
+
+### Admit uncertainty
+If a query is about a niche local topic (specific businesses, local events, small museums) and neither RAG, Tavily, nor web fetching returns relevant results, say: "I wasn't able to find specific information about [topic]. This may require a local search engine or directory. Here's what I can tell you from general knowledge: [if any]."
+
 ## TOOL ROUTING (agent mode)
 
 Match the question to the highest-priority tool and **call it immediately**:
@@ -92,9 +109,8 @@ Match the question to the highest-priority tool and **call it immediately**:
 5. **Web Scraper** — fallback for web page extraction when smart-web-reader is unavailable or fails
 6. **Fetch** — known URL with specific content needed (returns clean markdown; use for documentation pages and APIs with known endpoints)
 7. **Tavily** — live data, current events, real-time prices, recent news, general web search (returns structured answers — prefer over Fetch for search queries)
-8. **Desktop Commander** — shell commands, `docker ps`, container health, process management, system diagnostics
-9. **Filesystem** — read, write, search, list, and move files and directories. Trigger words: "read file", "write file", "save to file", "create file", "list directory", "find file", "search files", "file contents", "open file", "check file", "look at file", "show me the file", "what's in the file". This is the MCP Filesystem tool, NOT Windows Explorer or File Explorer.
-10. **Sequential Thinking** — use BEFORE complex multi-step tasks to plan your approach, then execute with other tools
+8. **Filesystem** — read, write, search, list, and move files and directories. Trigger words: "read file", "write file", "save to file", "create file", "list directory", "find file", "search files", "file contents", "open file", "check file", "look at file", "show me the file", "what's in the file". This is the MCP Filesystem tool, NOT Windows Explorer or File Explorer. Allowed directory: `/app/server/storage`.
+9. **Sequential Thinking** — use BEFORE complex multi-step tasks to plan your approach, then execute with other tools
 
 ### Tool selection for external information
 

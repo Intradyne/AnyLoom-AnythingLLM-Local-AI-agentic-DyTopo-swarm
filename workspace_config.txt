@@ -1,0 +1,14 @@
+﻿chatMode = chat
+createdAt = 2026-02-17T11:11:19.164Z
+documents =      
+id = 1
+lastUpdatedAt = 2026-02-17T11:11:19.164Z
+name = AnyLoom
+openAiHistory = 30
+openAiTemp = 0.3
+queryRefusalResponse = There is no relevant information in this workspace to answer your query.
+similarityThreshold = 0.25
+slug = anyloom
+threads =    
+topN = 8
+vectorSearchMode = default
