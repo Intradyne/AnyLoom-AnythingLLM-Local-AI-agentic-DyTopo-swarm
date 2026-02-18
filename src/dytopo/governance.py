@@ -589,3 +589,137 @@ async def update_agent_metrics(
 
         # Compute failure rate
         metrics["failure_rate"] = metrics["total_failures"] / max(1, metrics["total_rounds"])
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  AEGEAN-PROTOCOL CONSENSUS TERMINATION
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+_embedder = None
+
+
+def _get_embedder():
+    """Lazy-load MiniLM-L6-v2 for consensus embedding. CPU — tiny model."""
+    global _embedder
+    if _embedder is None:
+        from sentence_transformers import SentenceTransformer
+        _embedder = SentenceTransformer("all-MiniLM-L6-v2", device="cpu")
+    return _embedder
+
+
+def compute_consensus_matrix(embeddings: list[list[float]]) -> list[list[float]]:
+    """Compute NxN cosine similarity matrix for consensus detection.
+
+    Returns a nested list (not numpy array) for JSON serialization.
+
+    Args:
+        embeddings: List of embedding vectors, each a list of floats.
+
+    Returns:
+        NxN nested list of cosine similarities in [−1, 1].
+    """
+    import numpy as np
+
+    arr = np.array(embeddings, dtype=np.float64)
+    # Normalize each row to unit length
+    norms = np.linalg.norm(arr, axis=1, keepdims=True)
+    # Avoid division by zero for zero-length vectors
+    norms = np.where(norms == 0, 1.0, norms)
+    arr_normed = arr / norms
+    # Cosine similarity via dot product of normalized vectors
+    sim_matrix = arr_normed @ arr_normed.T
+    return sim_matrix.tolist()
+
+
+async def check_aegean_termination(
+    agent_outputs: list[str],
+    agent_names: list[str],
+    round_number: int,
+    min_rounds: int = 2,
+    consensus_threshold: float = 0.85,
+    min_agreement_ratio: float = 0.75,
+) -> tuple[bool, list]:
+    """
+    Aegean-protocol-inspired consensus check.
+
+    Algorithm:
+    1. If round_number < min_rounds, return (False, [])
+    2. Embed all agent outputs using _get_embedder()
+    3. Compute pairwise cosine similarities via compute_consensus_matrix()
+    4. For each agent, compute its average similarity to all other agents
+    5. An agent "votes to terminate" if its avg similarity > consensus_threshold
+    6. If the fraction of termination votes >= min_agreement_ratio, terminate
+    7. Return (should_terminate, list_of_AegeanVote_objects)
+
+    Args:
+        agent_outputs: List of textual outputs from each agent.
+        agent_names: Corresponding agent names (same length as agent_outputs).
+        round_number: Current round number (0-indexed or 1-indexed).
+        min_rounds: Minimum rounds before termination can trigger.
+        consensus_threshold: Per-agent avg similarity above which it votes to terminate.
+        min_agreement_ratio: Fraction of agents that must vote to terminate.
+
+    Returns:
+        Tuple of (should_terminate, list_of_AegeanVote).
+    """
+    from dytopo.models import AegeanVote
+
+    # Guard: not enough rounds yet
+    if round_number < min_rounds:
+        return False, []
+
+    # Guard: empty or mismatched inputs
+    if not agent_outputs or not agent_names:
+        return False, []
+
+    n = len(agent_outputs)
+
+    # Single agent trivially agrees with itself — but no *other* agent to compare
+    if n < 2:
+        vote = AegeanVote(
+            agent_name=agent_names[0],
+            round_number=round_number,
+            supports_termination=True,
+            confidence=1.0,
+        )
+        return True, [vote]
+
+    # Step 2: embed all outputs
+    model = _get_embedder()
+    embeddings = model.encode(agent_outputs, convert_to_numpy=True).tolist()
+
+    # Step 3: compute pairwise cosine similarities
+    sim_matrix = compute_consensus_matrix(embeddings)
+
+    # Steps 4-5: per-agent average similarity to *other* agents, then vote
+    votes: list[AegeanVote] = []
+    terminate_count = 0
+
+    for i in range(n):
+        # Average similarity to all other agents (exclude self)
+        other_sims = [sim_matrix[i][j] for j in range(n) if j != i]
+        avg_sim = sum(other_sims) / len(other_sims)
+
+        supports = avg_sim > consensus_threshold
+        if supports:
+            terminate_count += 1
+
+        votes.append(AegeanVote(
+            agent_name=agent_names[i],
+            round_number=round_number,
+            supports_termination=supports,
+            confidence=round(avg_sim, 6),
+        ))
+
+    # Step 6: check agreement ratio
+    agreement_ratio = terminate_count / n
+    should_terminate = agreement_ratio >= min_agreement_ratio
+
+    if should_terminate:
+        logger.info(
+            f"Aegean termination triggered at round {round_number}: "
+            f"{terminate_count}/{n} agents voted ({agreement_ratio:.0%} >= {min_agreement_ratio:.0%})"
+        )
+
+    return should_terminate, votes

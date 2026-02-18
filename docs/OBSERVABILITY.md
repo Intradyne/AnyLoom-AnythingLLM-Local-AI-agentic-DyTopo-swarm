@@ -175,6 +175,25 @@ async def run_swarm(swarm: SwarmTask, ...):
                             raise
 ```
 
+### 5. Health Checker (`health/checker.py`)
+
+Pre-run health probes for all stack components, integrated into the orchestrator's `run_swarm()`.
+
+**Features:**
+- Parallel async probes via `asyncio.gather()` with per-probe timeouts
+- LLM, Qdrant, AnythingLLM, and GPU probes
+- `preflight_check()` convenience function returns `StackHealth` model
+- Non-fatal by default — only LLM failure aborts the swarm
+
+**Usage:**
+```python
+from dytopo.health.checker import preflight_check
+
+health = await preflight_check(llm_url="http://localhost:8008")
+for comp in health.components:
+    print(f"{comp.component}: {'OK' if comp.healthy else comp.error} ({comp.latency_ms:.0f}ms)")
+```
+
 ## Performance Budget
 
 The observability layer is designed with minimal overhead:
@@ -299,9 +318,21 @@ If metrics show zero counts:
    stats = await metrics.get_stats("latency", agent="dev")  # Returns empty
    ```
 
-## Examples
+## System Status MCP Server
 
-See [examples/observability_example.py](../examples/observability_example.py) for a comprehensive demonstration.
+The `src/mcp/system_status.py` FastMCP server exposes a `system_status` tool that probes all stack components and returns structured JSON:
+
+- **LLM** (llama.cpp): `GET /v1/models` — reports loaded model and slot availability
+- **Qdrant**: `GET /collections` — reports collection count and names
+- **Docker**: `docker ps` — reports running container count and names
+- **GPU**: `nvidia-smi --query-gpu=...` — reports GPU name, utilization, VRAM, temperature
+
+```python
+from mcp.system_status import mcp
+# Run via: python -m mcp.system_status
+```
+
+Each probe returns `{component, status, latency_ms, details, error}`. The aggregate response includes `all_healthy` and `checked_at` fields.
 
 ## API Reference
 

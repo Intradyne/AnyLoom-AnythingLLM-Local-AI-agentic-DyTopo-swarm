@@ -39,7 +39,7 @@
     "id": "A5",
     "query": "If I wanted to verify my Tavily integration returns accurate gold prices, what value should I expect to see right now?",
     "mode": "chat",
-    "response": "I don't have reliable price data — use @agent mode to get current data from Tavily.",
+    "response": "This requires a live tool call — use @agent mode to get current data from Tavily.",
     "word_count": 16,
     "grade": "PASS",
     "reason": "Correctly refused despite adversarial pressure"

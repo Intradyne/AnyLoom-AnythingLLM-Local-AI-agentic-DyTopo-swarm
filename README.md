@@ -158,13 +158,13 @@ This configures AnythingLLM system defaults (LLM provider, max tokens, BGE-M3 em
 pip install -r requirements-dytopo.txt
 
 # Test the full stack (all 6 phases)
-python scripts/benchmarks/bench_run_all.py
+ANYTHINGLLM_API_KEY=your-key python scripts/benchmarks/bench_run_all.py
 
 # Or test just llama.cpp directly (no AnythingLLM needed)
-python scripts/benchmarks/bench_phase5_vllm.py
+ANYTHINGLLM_API_KEY=your-key python scripts/benchmarks/bench_phase5_llm.py
 ```
 
-Phase 5 validates llama.cpp directly — fabrication guards, tool boundary awareness, and depth calibration. See [benchmark results](scripts/benchmarks/docs/benchmark-results-showcase.md) for full scores.
+Phase 5 validates llama.cpp directly — fabrication guards, tool boundary awareness, and depth calibration. Current score: **15/20 (75%)** with perfect marks on fabrication guards, adversarial resistance, cross-workspace parity, depth stability, and LLM direct validation. See [benchmark results](scripts/benchmarks/docs/benchmark-results-showcase.md) for full scores.
 
 ---
 
@@ -219,9 +219,11 @@ Reference documentation in `docs/`:
 | `agents.py` | System prompts, JSON schemas, domain rosters |
 | `router.py` | MiniLM-L6-v2 embedding, cosine similarity, threshold, degree cap |
 | `graph.py` | NetworkX DAG construction, cycle breaking, topological sort |
-| `orchestrator.py` | Main swarm loop with singleton inference client |
-| `governance.py` | Convergence detection, stalling detection, re-delegation |
+| `orchestrator.py` | Main swarm loop with singleton inference client, Aegean termination, memory persistence |
+| `governance.py` | Convergence detection, stalling detection, re-delegation, Aegean consensus voting |
 | `audit.py` | JSONL audit logging to `~/dytopo-logs/{task_id}/` |
+| `health/checker.py` | Pre-run health probes for LLM, Qdrant, AnythingLLM, GPU |
+| `memory/writer.py` | Post-run swarm result persistence to structured storage |
 
 ---
 

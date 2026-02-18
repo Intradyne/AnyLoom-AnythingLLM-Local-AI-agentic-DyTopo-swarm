@@ -10,13 +10,13 @@ DyTopo is a standalone Python package at `src/dytopo/` with 8 core modules and 6
 
 | Module | Purpose |
 |--------|---------|
-| `models.py` | Pydantic v2 data models: `AgentRole`, `SwarmDomain`, `AgentDescriptor`, `AgentState`, `AgentMetrics`, `SwarmMetrics`, `RoundRecord`, `ManagerDecision`, `SwarmStatus`, `SwarmTask` |
+| `models.py` | Pydantic v2 data models: `AgentRole`, `SwarmDomain`, `AgentDescriptor`, `AgentState`, `AgentMetrics`, `SwarmMetrics`, `RoundRecord`, `ManagerDecision`, `SwarmStatus`, `SwarmTask`, `SwarmMemoryRecord`, `HealthStatus`, `StackHealth`, `AegeanVote` |
 | `config.py` | YAML configuration loader — merges `dytopo_config.yaml` over built-in `_DEFAULTS`; includes `concurrency` section for backend selection |
 | `agents.py` | System prompts keyed by `(SwarmDomain, AgentRole)`, JSON schemas (`DESCRIPTOR_SCHEMA`, `AGENT_OUTPUT_SCHEMA`, `MANAGER_OUTPUT_SCHEMA`), prompt templates, `build_agent_roster()`, `get_system_prompt()`, `get_role_name()`, `get_worker_names()` |
 | `router.py` | Lazy singleton MiniLM-L6-v2, `embed_descriptors()`, `compute_similarity_matrix()`, `apply_threshold()`, `enforce_max_indegree()`, `build_routing_result()`, `log_routing_round()` |
 | `graph.py` | `build_execution_graph()` (NetworkX DiGraph), `break_cycles()` (greedy lowest-weight removal), `get_execution_order()` (Kahn's with alphabetical tiebreak), `get_execution_tiers()` (parallel-within-tier ordering via `nx.topological_generations()`), `get_incoming_agents()` |
 | `orchestrator.py` | Backend-agnostic LLM client via `_get_llm_client()` (connects to llama.cpp on port 8008), semaphore-based concurrency via `_get_semaphore()` (8 concurrent), `_llm_call()` with tenacity retry (3 attempts, exponential backoff), `_call_manager()`, `_call_worker()`, `run_swarm()` main loop with parallelized phases via `asyncio.gather()` |
-| `governance.py` | `execute_agent_safe()`, `detect_convergence()`, `detect_stalling()`, `recommend_redelegation()`, `update_agent_metrics()` |
+| `governance.py` | `execute_agent_safe()`, `detect_convergence()`, `detect_stalling()`, `recommend_redelegation()`, `update_agent_metrics()`, `compute_consensus_matrix()`, `check_aegean_termination()` |
 | `audit.py` | `SwarmAuditLog` class — JSONL event logging to `~/dytopo-logs/{task_id}/audit.jsonl` |
 
 ### Sub-packages
@@ -28,6 +28,8 @@ DyTopo is a standalone Python package at `src/dytopo/` with 8 core modules and 6
 | `messaging/` | `AgentMessage`, `MessageHistory`, `MessageRouter` | Typed message passing between agents with history tracking |
 | `routing/async_engine.py` | `AsyncRoutingEngine` | Async wrapper around `router.py` with lock-based embedding serialization |
 | `delegation/` | `DelegationManager`, `DelegationRecord` | Delegation with depth, concurrency, and timeout control |
+| `memory/` | `SwarmMemoryWriter` | Embeds and persists completed swarm results to Qdrant for semantic retrieval of past solutions |
+| `health/` | `HealthChecker`, `preflight_check()` | Parallel health probes for LLM, Qdrant, AnythingLLM, and GPU; pre-run preflight gate |
 | `documentation/` | `DocumentationGenerator` | Auto-generated living docs from code and execution data |
 
 ### Configuration
@@ -109,6 +111,11 @@ The server stores up to 20 concurrent tasks in `_swarm_tasks` dict and evicts ol
 - **Early termination**: Stops when outputs stabilize (default: 90% similarity over 3 rounds, configurable via `convergence_threshold`)
 - **Token savings**: Prevents wasted rounds when solution has converged
 
+### Aegean Consensus Termination
+- **`check_aegean_termination`**: Embedding-based consensus check across agent outputs using MiniLM-L6-v2
+- **Algorithm**: Embeds all agent outputs, computes pairwise cosine similarity, each agent "votes" to terminate if its avg similarity exceeds `consensus_threshold` (default 0.85). If >= 75% of agents vote, the swarm terminates early
+- **Integration**: Runs after convergence detection in rounds >= 2; non-fatal — errors are silently logged
+
 ### Stalling Detection
 - **`detect_stalling`**: Monitors individual agents for repeated outputs
 - **Per-agent tracking**: Identifies stuck agents without affecting others
@@ -124,6 +131,16 @@ The server stores up to 20 concurrent tasks in `_swarm_tasks` dict and evicts ol
 - **Event types**: `swarm_started`, `round_started`, `agent_executed`, `agent_failed`, `convergence_detected`, `redelegation`, `swarm_completed`
 - **Routing logs**: Per-round similarity matrices saved as JSON in `~/dytopo-logs/{task_id}/round_NN_routing.json`
 - **Analysis-ready**: Easy to parse with `jq`, `awk`, or Python for post-hoc analysis
+
+### Swarm Memory Persistence
+- **`SwarmMemoryWriter`** (`memory/writer.py`): After a successful swarm run, the task description, key findings, and agent outputs are embedded via MiniLM-L6-v2 (384-dim) and stored in Qdrant collection `swarm_memory`
+- **Semantic retrieval**: `query_similar(text, limit)` finds past solutions relevant to a new task
+- **Graceful degradation**: Qdrant unavailability is caught and logged — memory write failure never crashes a swarm
+
+### Pre-run Health Check
+- **`preflight_check()`** (`health/checker.py`): Parallel HTTP probes to LLM (llama.cpp `/v1/models`), Qdrant (`/collections`), AnythingLLM (`/api/v1/auth`), and GPU (`nvidia-smi`)
+- **Integration**: Runs at the start of `run_swarm()`. If LLM is unreachable, the swarm aborts with `RuntimeError`. Other component failures are logged as warnings
+- **Models**: `HealthStatus` and `StackHealth` Pydantic models track per-component health with latency
 
 ## Error Isolation
 

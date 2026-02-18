@@ -11,7 +11,7 @@ from __future__ import annotations
 import time
 import uuid
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
@@ -142,3 +142,44 @@ class SwarmTask(BaseModel):
     termination_reason: str = "max_rounds"
     progress_message: str = ""
     swarm_metrics: SwarmMetrics = Field(default_factory=SwarmMetrics)
+
+
+class SwarmMemoryRecord(BaseModel):
+    """Compressed swarm result for Qdrant persistence."""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    task_description: str
+    domain: SwarmDomain
+    agent_roles: list[str]
+    round_count: int
+    key_findings: list[str]
+    final_answer_summary: str
+    convergence_achieved: bool
+    total_tokens: int
+    wall_time_ms: int
+    created_at: float = Field(default_factory=time.time)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class HealthStatus(BaseModel):
+    """Structured health check result for a single component."""
+    component: str
+    healthy: bool
+    latency_ms: float = 0.0
+    details: dict[str, Any] = Field(default_factory=dict)
+    error: Optional[str] = None
+    checked_at: float = Field(default_factory=time.time)
+
+
+class StackHealth(BaseModel):
+    """Aggregate health for the full stack."""
+    components: list[HealthStatus] = Field(default_factory=list)
+    all_healthy: bool = True
+    checked_at: float = Field(default_factory=time.time)
+
+
+class AegeanVote(BaseModel):
+    """One agent's vote for early termination."""
+    agent_name: str
+    round_number: int
+    supports_termination: bool
+    confidence: float = 0.0  # cosine similarity to consensus answer

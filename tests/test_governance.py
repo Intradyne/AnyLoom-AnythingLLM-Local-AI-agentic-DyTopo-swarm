@@ -21,6 +21,8 @@ from dytopo.governance import (
     detect_stalling,
     recommend_redelegation,
     update_agent_metrics,
+    check_aegean_termination,
+    compute_consensus_matrix,
 )
 
 
@@ -286,6 +288,195 @@ class TestBackendRetryPolicy:
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  AEGEAN CONSENSUS TESTS
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+from unittest.mock import patch, MagicMock
+import numpy as np
+
+
+@pytest.mark.asyncio
+async def test_aegean_below_min_rounds():
+    """Returns (False, []) when round < min_rounds."""
+    print("\n[TEST] aegean below min_rounds")
+    result, votes = await check_aegean_termination(
+        agent_outputs=["output A", "output B"],
+        agent_names=["agent1", "agent2"],
+        round_number=1,
+        min_rounds=2,
+    )
+    assert result is False, "Should not terminate below min_rounds"
+    assert votes == [], "Should return empty votes below min_rounds"
+    print("[PASS] Aegean below min_rounds works")
+
+
+@pytest.mark.asyncio
+async def test_aegean_high_consensus():
+    """Returns (True, votes) when all outputs are near-identical (mocked embeddings)."""
+    print("\n[TEST] aegean high consensus")
+
+    # All agents get nearly identical embeddings -> high cosine similarity
+    fake_embeddings = np.array([
+        [1.0, 0.0, 0.0],
+        [0.99, 0.1, 0.0],
+        [0.98, 0.05, 0.0],
+    ], dtype=np.float32)
+
+    mock_model = MagicMock()
+    mock_model.encode.return_value = fake_embeddings
+
+    with patch("dytopo.governance._get_embedder", return_value=mock_model):
+        result, votes = await check_aegean_termination(
+            agent_outputs=["same idea", "same idea", "same idea"],
+            agent_names=["a1", "a2", "a3"],
+            round_number=3,
+            min_rounds=2,
+            consensus_threshold=0.85,
+            min_agreement_ratio=0.75,
+        )
+
+    assert result is True, f"Should terminate with high consensus, got votes: {votes}"
+    assert len(votes) == 3, "Should have one vote per agent"
+    for v in votes:
+        assert v.supports_termination is True, f"Agent {v.agent_name} should vote to terminate"
+        assert v.confidence > 0.85, f"Agent {v.agent_name} confidence {v.confidence} should be > 0.85"
+    print("[PASS] Aegean high consensus works")
+
+
+@pytest.mark.asyncio
+async def test_aegean_low_consensus():
+    """Returns (False, votes) when outputs diverge (orthogonal mocked vectors)."""
+    print("\n[TEST] aegean low consensus")
+
+    # Orthogonal vectors -> cosine similarity ~0
+    fake_embeddings = np.array([
+        [1.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0],
+        [0.0, 0.0, 1.0],
+    ], dtype=np.float32)
+
+    mock_model = MagicMock()
+    mock_model.encode.return_value = fake_embeddings
+
+    with patch("dytopo.governance._get_embedder", return_value=mock_model):
+        result, votes = await check_aegean_termination(
+            agent_outputs=["apples", "bananas", "cherries"],
+            agent_names=["a1", "a2", "a3"],
+            round_number=5,
+            min_rounds=2,
+            consensus_threshold=0.85,
+            min_agreement_ratio=0.75,
+        )
+
+    assert result is False, "Should NOT terminate with orthogonal embeddings"
+    assert len(votes) == 3, "Should have one vote per agent"
+    for v in votes:
+        assert v.supports_termination is False, f"Agent {v.agent_name} should not vote to terminate"
+        assert v.confidence < 0.85, f"Agent {v.agent_name} confidence {v.confidence} should be < 0.85"
+    print("[PASS] Aegean low consensus works")
+
+
+@pytest.mark.asyncio
+async def test_aegean_partial_consensus():
+    """Tests the min_agreement_ratio threshold — some agents agree, some do not."""
+    print("\n[TEST] aegean partial consensus")
+
+    # 3 agents: two are very similar, one is orthogonal
+    # a1 and a2 will have high mutual similarity, a3 is orthogonal to both
+    fake_embeddings = np.array([
+        [1.0, 0.0, 0.0],
+        [0.99, 0.1, 0.0],
+        [0.0, 0.0, 1.0],
+    ], dtype=np.float32)
+
+    mock_model = MagicMock()
+    mock_model.encode.return_value = fake_embeddings
+
+    # With min_agreement_ratio=0.75, need 3 out of 3 (ceil(3*0.75)=3), so 2/3 < 0.75 -> no termination
+    with patch("dytopo.governance._get_embedder", return_value=mock_model):
+        result, votes = await check_aegean_termination(
+            agent_outputs=["same", "same", "different"],
+            agent_names=["a1", "a2", "a3"],
+            round_number=4,
+            min_rounds=2,
+            consensus_threshold=0.85,
+            min_agreement_ratio=0.75,
+        )
+
+    assert result is False, "Should NOT terminate when only 2/3 agree and ratio requires 0.75"
+    assert len(votes) == 3
+
+    # a3 (orthogonal) should definitely not support termination
+    a3_vote = [v for v in votes if v.agent_name == "a3"][0]
+    assert a3_vote.supports_termination is False, "Orthogonal agent should not vote to terminate"
+
+    # Now lower the agreement ratio so 2/3 >= 0.6 is enough -> should terminate
+    with patch("dytopo.governance._get_embedder", return_value=mock_model):
+        result2, votes2 = await check_aegean_termination(
+            agent_outputs=["same", "same", "different"],
+            agent_names=["a1", "a2", "a3"],
+            round_number=4,
+            min_rounds=2,
+            consensus_threshold=0.45,
+            min_agreement_ratio=0.6,
+        )
+
+    # a1 and a2 avg sim to others includes their mutual sim (~1.0) and sim to a3 (~0)
+    # a1 avg = (sim(a1,a2) + sim(a1,a3))/2. sim(a1,a2) is high (~0.995), sim(a1,a3) ~0 => avg ~0.5
+    # With threshold=0.45, a1 and a2 should pass. 2/3 = 0.67 >= 0.6 -> terminate
+    assert result2 is True, f"Should terminate when agreement ratio is lowered, got votes: {votes2}"
+    print("[PASS] Aegean partial consensus works")
+
+
+def test_consensus_matrix_shape():
+    """Matrix is NxN with diagonal ~1.0."""
+    print("\n[TEST] consensus matrix shape")
+
+    # 4 random-ish normalized vectors
+    embeddings = [
+        [1.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0],
+        [0.0, 0.0, 1.0],
+        [0.577, 0.577, 0.577],
+    ]
+
+    matrix = compute_consensus_matrix(embeddings)
+
+    assert len(matrix) == 4, f"Should have 4 rows, got {len(matrix)}"
+    for row in matrix:
+        assert len(row) == 4, f"Each row should have 4 columns, got {len(row)}"
+
+    # Diagonal should be ~1.0 (self-similarity of normalized vectors)
+    for i in range(4):
+        assert abs(matrix[i][i] - 1.0) < 1e-6, (
+            f"Diagonal [{i}][{i}] should be ~1.0, got {matrix[i][i]}"
+        )
+
+    # Orthogonal vectors should have ~0 similarity
+    assert abs(matrix[0][1]) < 1e-6, "Orthogonal vectors should have ~0 similarity"
+    assert abs(matrix[0][2]) < 1e-6, "Orthogonal vectors should have ~0 similarity"
+    assert abs(matrix[1][2]) < 1e-6, "Orthogonal vectors should have ~0 similarity"
+
+    print("[PASS] Consensus matrix shape and values correct")
+
+
+@pytest.mark.asyncio
+async def test_aegean_empty_outputs():
+    """Handles empty list gracefully."""
+    print("\n[TEST] aegean empty outputs")
+
+    result, votes = await check_aegean_termination(
+        agent_outputs=[],
+        agent_names=[],
+        round_number=5,
+        min_rounds=2,
+    )
+    assert result is False, "Should not terminate with empty outputs"
+    assert votes == [], "Should return empty votes with empty outputs"
+    print("[PASS] Aegean empty outputs handled gracefully")
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  MAIN
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -296,6 +487,11 @@ async def run_async_tests():
     await test_execute_agent_safe_timeout()
     await test_execute_agent_safe_failure()
     await test_execute_agent_safe_invalid_json()
+    await test_aegean_below_min_rounds()
+    await test_aegean_high_consensus()
+    await test_aegean_low_consensus()
+    await test_aegean_partial_consensus()
+    await test_aegean_empty_outputs()
 
 
 def run_sync_tests():
@@ -304,6 +500,7 @@ def run_sync_tests():
     test_detect_stalling()
     test_recommend_redelegation()
     test_update_agent_metrics()
+    test_consensus_matrix_shape()
 
 
 if __name__ == "__main__":

@@ -2,15 +2,35 @@
   "1": {
     "name": "Explanation Tier",
     "status": "OK",
-    "score": "4/5",
-    "passed": 4,
+    "score": "0/5",
+    "passed": 0,
     "total": 5,
     "graded": true,
     "failures": [
       {
         "id": "E1",
-        "reason": "Missing port numbers",
-        "words": 141
+        "reason": "Over word limit: 316 words (max 150); Missing port numbers",
+        "words": 316
+      },
+      {
+        "id": "E2",
+        "reason": "Over word limit: 276 words (max 150)",
+        "words": 276
+      },
+      {
+        "id": "E3",
+        "reason": "Over word limit: 275 words (max 150); Missing history/no-history distinction",
+        "words": 275
+      },
+      {
+        "id": "E4",
+        "reason": "Contains ### headers (not allowed for explanation tier); Over word limit: 378 words (max 150)",
+        "words": 378
+      },
+      {
+        "id": "E5",
+        "reason": "Over word limit: 317 words (max 150)",
+        "words": 317
       }
     ]
   },
@@ -39,42 +59,42 @@
     "graded": false,
     "details": {
       "D3": {
-        "avg": 209.0,
+        "avg": 548.0,
         "spread": 0,
         "verdict": "Deterministic"
       },
       "D4": {
-        "avg": 100.0,
+        "avg": 262.0,
         "spread": 0,
         "verdict": "Deterministic"
       },
       "D5": {
-        "avg": 88.0,
+        "avg": 90.0,
         "spread": 0,
         "verdict": "Deterministic"
       },
       "D6": {
-        "avg": 63.0,
+        "avg": 48.0,
         "spread": 0,
         "verdict": "Deterministic"
       },
       "D7": {
-        "avg": 145.0,
+        "avg": 375.0,
         "spread": 0,
         "verdict": "Deterministic"
       },
       "D8": {
-        "avg": 213.0,
+        "avg": 246.0,
         "spread": 0,
         "verdict": "Deterministic"
       },
       "D9": {
-        "avg": 337.0,
+        "avg": 459.0,
         "spread": 0,
         "verdict": "Deterministic"
       },
       "D10": {
-        "avg": 249.0,
+        "avg": 337.0,
         "spread": 0,
         "verdict": "Deterministic"
       }
@@ -83,17 +103,10 @@
   "5": {
     "name": "LLM Direct Validation",
     "status": "OK",
-    "score": "4/5",
-    "passed": 4,
+    "score": "5/5",
+    "passed": 5,
     "total": 5,
-    "graded": true,
-    "failures": [
-      {
-        "id": "L5",
-        "reason": "Did not identify that web search requires tools",
-        "words": 15
-      }
-    ]
+    "graded": true
   },
   "6": {
     "name": "Showcase Gallery",
@@ -102,13 +115,13 @@
     "graded": false,
     "total": 7,
     "word_counts": {
-      "S1": 40,
+      "S1": 99,
       "S2": 16,
       "S3": 1,
-      "S4": 452,
-      "S5": 250,
-      "S6": 108,
-      "S7": 199
+      "S4": 713,
+      "S5": 445,
+      "S6": 115,
+      "S7": 280
     }
   }
 }

@@ -3,194 +3,194 @@
     "D3": [
       {
         "run": 1,
-        "word_count": 209,
-        "text": "The decision cascade is a tiered system that routes queries from the cheapest to the most expensive information source, ensuring efficient and cost-effective responses. It operates as a first-match system: the agent uses the highest tier that can answer the question and only descends to lower tiers when higher tiers produce insufficient results.  \n\n- **Tier 0**: Automatic RAG context — the Qdrant instance (`anyloom-qdrant` on port 6333) retrieves relevant document chunks and injects them into th"
+        "word_count": 548,
+        "text": "The **decision cascade** is a tiered, first-match system that determines how the agent selects the most appropriate tool or information source for a given query, progressing from the cheapest and fastest to the most expensive and specialized. It ensures efficient, cost-effective responses by prioritizing lower-cost options before escalating to higher-cost ones.\n\nThe cascade operates in **agent mode** (activated by `@agent`) and applies to all queries requiring external information. It consists o"
       },
       {
         "run": 2,
-        "word_count": 209,
-        "text": "The decision cascade is a tiered system that routes queries from the cheapest to the most expensive information source, ensuring efficient and cost-effective responses. It operates as a first-match system: the agent uses the highest tier that can answer the question and only descends to lower tiers when higher tiers produce insufficient results.  \n\n- **Tier 0**: Automatic RAG context — the Qdrant instance (`anyloom-qdrant` on port 6333) retrieves relevant document chunks and injects them into th"
+        "word_count": 548,
+        "text": "The **decision cascade** is a tiered, first-match system that determines how the agent selects the most appropriate tool or information source for a given query, progressing from the cheapest and fastest to the most expensive and specialized. It ensures efficient, cost-effective responses by prioritizing lower-cost options before escalating to higher-cost ones.\n\nThe cascade operates in **agent mode** (activated by `@agent`) and applies to all queries requiring external information. It consists o"
       },
       {
         "run": 3,
-        "word_count": 209,
-        "text": "The decision cascade is a tiered system that routes queries from the cheapest to the most expensive information source, ensuring efficient and cost-effective responses. It operates as a first-match system: the agent uses the highest tier that can answer the question and only descends to lower tiers when higher tiers produce insufficient results.  \n\n- **Tier 0**: Automatic RAG context — the Qdrant instance (`anyloom-qdrant` on port 6333) retrieves relevant document chunks and injects them into th"
+        "word_count": 548,
+        "text": "The **decision cascade** is a tiered, first-match system that determines how the agent selects the most appropriate tool or information source for a given query, progressing from the cheapest and fastest to the most expensive and specialized. It ensures efficient, cost-effective responses by prioritizing lower-cost options before escalating to higher-cost ones.\n\nThe cascade operates in **agent mode** (activated by `@agent`) and applies to all queries requiring external information. It consists o"
       }
     ],
     "D4": [
       {
         "run": 1,
-        "word_count": 100,
-        "text": "RRF (Reciprocal Rank Fusion) is a technique that fuses multiple ranked result lists into a single unified ranking by scoring each document as the reciprocal of its rank in each list. In this stack, RRF combines dense semantic search results (from BGE-M3 embeddings) and sparse keyword search results (from TF-weighted term frequency) to improve retrieval accuracy. This hybrid approach ensures that documents with high semantic relevance or exact keyword matches are prioritized, enhancing recall for"
+        "word_count": 262,
+        "text": "RRF stands for **Reciprocal Rank Fusion**, a technique used to combine multiple ranked result lists into a single unified ranking. It is employed in the hybrid search pipeline of the qdrant-rag MCP server to merge results from both dense semantic search and sparse keyword search.\n\n### How RRF Works:\n- For each document in the result lists, RRF computes a **final score** as the sum of the reciprocals of its rank in each list:\n  $$\n  \\text{Final Score} = \\frac{1}{\\text{rank}_{\\text{dense}}} + \\fra"
       },
       {
         "run": 2,
-        "word_count": 100,
-        "text": "RRF (Reciprocal Rank Fusion) is a technique that fuses multiple ranked result lists into a single unified ranking by scoring each document as the reciprocal of its rank in each list. In this stack, RRF combines dense semantic search results (from BGE-M3 embeddings) and sparse keyword search results (from TF-weighted term frequency) to improve retrieval accuracy. This hybrid approach ensures that documents with high semantic relevance or exact keyword matches are prioritized, enhancing recall for"
+        "word_count": 262,
+        "text": "RRF stands for **Reciprocal Rank Fusion**, a technique used to combine multiple ranked result lists into a single unified ranking. It is employed in the hybrid search pipeline of the qdrant-rag MCP server to merge results from both dense semantic search and sparse keyword search.\n\n### How RRF Works:\n- For each document in the result lists, RRF computes a **final score** as the sum of the reciprocals of its rank in each list:\n  $$\n  \\text{Final Score} = \\frac{1}{\\text{rank}_{\\text{dense}}} + \\fra"
       },
       {
         "run": 3,
-        "word_count": 100,
-        "text": "RRF (Reciprocal Rank Fusion) is a technique that fuses multiple ranked result lists into a single unified ranking by scoring each document as the reciprocal of its rank in each list. In this stack, RRF combines dense semantic search results (from BGE-M3 embeddings) and sparse keyword search results (from TF-weighted term frequency) to improve retrieval accuracy. This hybrid approach ensures that documents with high semantic relevance or exact keyword matches are prioritized, enhancing recall for"
+        "word_count": 262,
+        "text": "RRF stands for **Reciprocal Rank Fusion**, a technique used to combine multiple ranked result lists into a single unified ranking. It is employed in the hybrid search pipeline of the qdrant-rag MCP server to merge results from both dense semantic search and sparse keyword search.\n\n### How RRF Works:\n- For each document in the result lists, RRF computes a **final score** as the sum of the reciprocals of its rank in each list:\n  $$\n  \\text{Final Score} = \\frac{1}{\\text{rank}_{\\text{dense}}} + \\fra"
       }
     ],
     "D5": [
       {
         "run": 1,
-        "word_count": 88,
-        "text": "This stack uses the BGE-M3 embedding model for both dense and sparse vector generation in hybrid search. The dense vectors are computed via the BGE-M3 ONNX INT8 model on CPU (0.6 GB RAM, 0 VRAM) for the qdrant-rag MCP server's hybrid RRF pipeline. AnythingLLM uses the same BGE-M3 model in GGUF Q8_0 format through the llama.cpp /v1/embeddings endpoint for its dense-only retrieval. Both implementations serve the same Qdrant instance on port 6333, with the ONNX version handling CPU-based embeddings"
+        "word_count": 90,
+        "text": "This stack uses the BGE-M3 embedding model for both dense and sparse vector generation in its hybrid search pipeline. The dense embeddings are computed via the BGE-M3 ONNX INT8 model running on CPU, which serves the /v1/embeddings endpoint at port 8008. The same model is used by both the AnythingLLM workspace agent (for dense-only retrieval) and the qdrant-rag MCP server (for hybrid dense-plus-sparse search with Reciprocal Rank Fusion). The model consumes approximately 0.6 GB of RAM with zero VR"
       },
       {
         "run": 2,
-        "word_count": 88,
-        "text": "This stack uses the BGE-M3 embedding model for both dense and sparse vector generation in hybrid search. The dense vectors are computed via the BGE-M3 ONNX INT8 model on CPU (0.6 GB RAM, 0 VRAM) for the qdrant-rag MCP server's hybrid RRF pipeline. AnythingLLM uses the same BGE-M3 model in GGUF Q8_0 format through the llama.cpp /v1/embeddings endpoint for its dense-only retrieval. Both implementations serve the same Qdrant instance on port 6333, with the ONNX version handling CPU-based embeddings"
+        "word_count": 90,
+        "text": "This stack uses the BGE-M3 embedding model for both dense and sparse vector generation in its hybrid search pipeline. The dense embeddings are computed via the BGE-M3 ONNX INT8 model running on CPU, which serves the /v1/embeddings endpoint at port 8008. The same model is used by both the AnythingLLM workspace agent (for dense-only retrieval) and the qdrant-rag MCP server (for hybrid dense-plus-sparse search with Reciprocal Rank Fusion). The model consumes approximately 0.6 GB of RAM with zero VR"
       },
       {
         "run": 3,
-        "word_count": 88,
-        "text": "This stack uses the BGE-M3 embedding model for both dense and sparse vector generation in hybrid search. The dense vectors are computed via the BGE-M3 ONNX INT8 model on CPU (0.6 GB RAM, 0 VRAM) for the qdrant-rag MCP server's hybrid RRF pipeline. AnythingLLM uses the same BGE-M3 model in GGUF Q8_0 format through the llama.cpp /v1/embeddings endpoint for its dense-only retrieval. Both implementations serve the same Qdrant instance on port 6333, with the ONNX version handling CPU-based embeddings"
+        "word_count": 90,
+        "text": "This stack uses the BGE-M3 embedding model for both dense and sparse vector generation in its hybrid search pipeline. The dense embeddings are computed via the BGE-M3 ONNX INT8 model running on CPU, which serves the /v1/embeddings endpoint at port 8008. The same model is used by both the AnythingLLM workspace agent (for dense-only retrieval) and the qdrant-rag MCP server (for hybrid dense-plus-sparse search with Reciprocal Rank Fusion). The model consumes approximately 0.6 GB of RAM with zero VR"
       }
     ],
     "D6": [
       {
         "run": 1,
-        "word_count": 63,
-        "text": "AnythingLLM's RAG pipeline uses 6,600-character chunks with 1,000-character overlap, split using a recursive text splitter that respects paragraph boundaries. This configuration ensures that document content is broken into manageable segments while preserving contextual continuity across chunk boundaries. The chunks are embedded via the BGE-M3 model in GGUF Q8_0 format through the llama.cpp /v1/embeddings endpoint and stored in the `anyloom_docs` collection on port 6333."
+        "word_count": 48,
+        "text": "AnythingLLM's RAG pipeline uses **6,600-character chunks** with **1,000-character overlap**. These chunks are generated using a recursive text splitter that respects paragraph boundaries, ensuring semantic coherence while maintaining context continuity across adjacent segments. This configuration supports dense-only semantic retrieval via BGE-M3 embeddings and is optimized for natural language understanding."
       },
       {
         "run": 2,
-        "word_count": 63,
-        "text": "AnythingLLM's RAG pipeline uses 6,600-character chunks with 1,000-character overlap, split using a recursive text splitter that respects paragraph boundaries. This configuration ensures that document content is broken into manageable segments while preserving contextual continuity across chunk boundaries. The chunks are embedded via the BGE-M3 model in GGUF Q8_0 format through the llama.cpp /v1/embeddings endpoint and stored in the `anyloom_docs` collection on port 6333."
+        "word_count": 48,
+        "text": "AnythingLLM's RAG pipeline uses **6,600-character chunks** with **1,000-character overlap**. These chunks are generated using a recursive text splitter that respects paragraph boundaries, ensuring semantic coherence while maintaining context continuity across adjacent segments. This configuration supports dense-only semantic retrieval via BGE-M3 embeddings and is optimized for natural language understanding."
       },
       {
         "run": 3,
-        "word_count": 63,
-        "text": "AnythingLLM's RAG pipeline uses 6,600-character chunks with 1,000-character overlap, split using a recursive text splitter that respects paragraph boundaries. This configuration ensures that document content is broken into manageable segments while preserving contextual continuity across chunk boundaries. The chunks are embedded via the BGE-M3 model in GGUF Q8_0 format through the llama.cpp /v1/embeddings endpoint and stored in the `anyloom_docs` collection on port 6333."
+        "word_count": 48,
+        "text": "AnythingLLM's RAG pipeline uses **6,600-character chunks** with **1,000-character overlap**. These chunks are generated using a recursive text splitter that respects paragraph boundaries, ensuring semantic coherence while maintaining context continuity across adjacent segments. This configuration supports dense-only semantic retrieval via BGE-M3 embeddings and is optimized for natural language understanding."
       }
     ],
     "D7": [
       {
         "run": 1,
-        "word_count": 145,
-        "text": "The Memory knowledge graph is the second tier in the decision cascade, positioned after automatic RAG context (Tier 0). It serves as the primary source for stable, long-term facts—such as port mappings (port 8008 for llama.cpp inference, port 6333 for Qdrant), configuration values (RAG_GPU_THREADS=8, EMBED_BATCH_SIZE=16), architecture decisions (why hybrid search is used for the MCP pipeline and dense-only for AnythingLLM), and resolved error patterns. The agent checks Memory first for any query"
+        "word_count": 375,
+        "text": "The Memory knowledge graph is a core component of the **decision cascade**, serving as **Tier 1** — the second-fastest and most reliable source after automatic RAG context (Tier 0). It is prioritized for stable, structured facts that are critical to system operation and architecture.\n\n### Role in the Decision Cascade:\n1. **Tier 1: Memory Knowledge Graph**  \n   - **When Checked**: After Tier 0 (automatic RAG context) fails to provide a sufficient answer, the agent performs a `search_nodes` query "
       },
       {
         "run": 2,
-        "word_count": 145,
-        "text": "The Memory knowledge graph is the second tier in the decision cascade, positioned after automatic RAG context (Tier 0). It serves as the primary source for stable, long-term facts—such as port mappings (port 8008 for llama.cpp inference, port 6333 for Qdrant), configuration values (RAG_GPU_THREADS=8, EMBED_BATCH_SIZE=16), architecture decisions (why hybrid search is used for the MCP pipeline and dense-only for AnythingLLM), and resolved error patterns. The agent checks Memory first for any query"
+        "word_count": 375,
+        "text": "The Memory knowledge graph is a core component of the **decision cascade**, serving as **Tier 1** — the second-fastest and most reliable source after automatic RAG context (Tier 0). It is prioritized for stable, structured facts that are critical to system operation and architecture.\n\n### Role in the Decision Cascade:\n1. **Tier 1: Memory Knowledge Graph**  \n   - **When Checked**: After Tier 0 (automatic RAG context) fails to provide a sufficient answer, the agent performs a `search_nodes` query "
       },
       {
         "run": 3,
-        "word_count": 145,
-        "text": "The Memory knowledge graph is the second tier in the decision cascade, positioned after automatic RAG context (Tier 0). It serves as the primary source for stable, long-term facts—such as port mappings (port 8008 for llama.cpp inference, port 6333 for Qdrant), configuration values (RAG_GPU_THREADS=8, EMBED_BATCH_SIZE=16), architecture decisions (why hybrid search is used for the MCP pipeline and dense-only for AnythingLLM), and resolved error patterns. The agent checks Memory first for any query"
+        "word_count": 375,
+        "text": "The Memory knowledge graph is a core component of the **decision cascade**, serving as **Tier 1** — the second-fastest and most reliable source after automatic RAG context (Tier 0). It is prioritized for stable, structured facts that are critical to system operation and architecture.\n\n### Role in the Decision Cascade:\n1. **Tier 1: Memory Knowledge Graph**  \n   - **When Checked**: After Tier 0 (automatic RAG context) fails to provide a sufficient answer, the agent performs a `search_nodes` query "
       }
     ],
     "D8": [
       {
         "run": 1,
-        "word_count": 213,
-        "text": "The llama.cpp agent (via the Docker MCP Gateway) has access to nine containerized MCP tools, which are exclusive to the MCP system and not available to AnythingLLM. These tools are:\n\n1. **Desktop Commander** – executes OS-level commands (e.g., `docker ps`, `nvidia-smi`, `systemctl`) and manages processes, containers, and system health.\n2. **Filesystem** – reads, writes, searches, and lists files and directories (e.g., `read file`, `find file`, `list directory`).\n3. **Memory** – reads and writes "
+        "word_count": 246,
+        "text": "The llama.cpp agent (running in @agent mode) has access to the **nine containerized MCP tools** provided by the Docker MCP Gateway. These tools are **not** part of AnythingLLM’s native Agent Skills and are exclusively available through the MCP interface. They are:\n\n1. **Desktop Commander** – Executes operating system commands (e.g., `docker ps`, `nvidia-smi`, `systemctl status`) and manages running processes, containers, and system health.\n2. **Filesystem** – Reads, writes, searches, and lists f"
       },
       {
         "run": 2,
-        "word_count": 213,
-        "text": "The llama.cpp agent (via the Docker MCP Gateway) has access to nine containerized MCP tools, which are exclusive to the MCP system and not available to AnythingLLM. These tools are:\n\n1. **Desktop Commander** – executes OS-level commands (e.g., `docker ps`, `nvidia-smi`, `systemctl`) and manages processes, containers, and system health.\n2. **Filesystem** – reads, writes, searches, and lists files and directories (e.g., `read file`, `find file`, `list directory`).\n3. **Memory** – reads and writes "
+        "word_count": 246,
+        "text": "The llama.cpp agent (running in @agent mode) has access to the **nine containerized MCP tools** provided by the Docker MCP Gateway. These tools are **not** part of AnythingLLM’s native Agent Skills and are exclusively available through the MCP interface. They are:\n\n1. **Desktop Commander** – Executes operating system commands (e.g., `docker ps`, `nvidia-smi`, `systemctl status`) and manages running processes, containers, and system health.\n2. **Filesystem** – Reads, writes, searches, and lists f"
       },
       {
         "run": 3,
-        "word_count": 213,
-        "text": "The llama.cpp agent (via the Docker MCP Gateway) has access to nine containerized MCP tools, which are exclusive to the MCP system and not available to AnythingLLM. These tools are:\n\n1. **Desktop Commander** – executes OS-level commands (e.g., `docker ps`, `nvidia-smi`, `systemctl`) and manages processes, containers, and system health.\n2. **Filesystem** – reads, writes, searches, and lists files and directories (e.g., `read file`, `find file`, `list directory`).\n3. **Memory** – reads and writes "
+        "word_count": 246,
+        "text": "The llama.cpp agent (running in @agent mode) has access to the **nine containerized MCP tools** provided by the Docker MCP Gateway. These tools are **not** part of AnythingLLM’s native Agent Skills and are exclusively available through the MCP interface. They are:\n\n1. **Desktop Commander** – Executes operating system commands (e.g., `docker ps`, `nvidia-smi`, `systemctl status`) and manages running processes, containers, and system health.\n2. **Filesystem** – Reads, writes, searches, and lists f"
       }
     ],
     "D9": [
       {
         "run": 1,
-        "word_count": 337,
-        "text": "| Feature | AnythingLLM RAG Pipeline | qdrant-rag MCP Server Pipeline |\n|--------|----------------------------|-------------------------------|\n| **Chunking Strategy** | Recursive text splitting with 6,600-character chunks and 1,000-character overlap, preserving paragraph boundaries. Chunks are not aligned to section headers. | Deterministic section-header-based splitting (e.g., `##` headers) with zero overlap. Chunks are aligned to structural document elements, ensuring precise semantic boundar"
+        "word_count": 459,
+        "text": "Here is a side-by-side comparison of the **two RAG pipelines** in this stack: the **AnythingLLM workspace agent** (passive, dense-only) and the **qdrant-rag MCP server** (active, hybrid RRF), based on chunking strategy, embedding format, and retrieval mechanism.\n\n| Feature | **AnythingLLM Workspace Agent** | **qdrant-rag MCP Server** |\n|--------|-------------------------------|---------------------------|\n| **Chunking Strategy** | Recursive text splitting with **6,600-character chunks** and **1,"
       },
       {
         "run": 2,
-        "word_count": 337,
-        "text": "| Feature | AnythingLLM RAG Pipeline | qdrant-rag MCP Server Pipeline |\n|--------|----------------------------|-------------------------------|\n| **Chunking Strategy** | Recursive text splitting with 6,600-character chunks and 1,000-character overlap, preserving paragraph boundaries. Chunks are not aligned to section headers. | Deterministic section-header-based splitting (e.g., `##` headers) with zero overlap. Chunks are aligned to structural document elements, ensuring precise semantic boundar"
+        "word_count": 459,
+        "text": "Here is a side-by-side comparison of the **two RAG pipelines** in this stack: the **AnythingLLM workspace agent** (passive, dense-only) and the **qdrant-rag MCP server** (active, hybrid RRF), based on chunking strategy, embedding format, and retrieval mechanism.\n\n| Feature | **AnythingLLM Workspace Agent** | **qdrant-rag MCP Server** |\n|--------|-------------------------------|---------------------------|\n| **Chunking Strategy** | Recursive text splitting with **6,600-character chunks** and **1,"
       },
       {
         "run": 3,
-        "word_count": 337,
-        "text": "| Feature | AnythingLLM RAG Pipeline | qdrant-rag MCP Server Pipeline |\n|--------|----------------------------|-------------------------------|\n| **Chunking Strategy** | Recursive text splitting with 6,600-character chunks and 1,000-character overlap, preserving paragraph boundaries. Chunks are not aligned to section headers. | Deterministic section-header-based splitting (e.g., `##` headers) with zero overlap. Chunks are aligned to structural document elements, ensuring precise semantic boundar"
+        "word_count": 459,
+        "text": "Here is a side-by-side comparison of the **two RAG pipelines** in this stack: the **AnythingLLM workspace agent** (passive, dense-only) and the **qdrant-rag MCP server** (active, hybrid RRF), based on chunking strategy, embedding format, and retrieval mechanism.\n\n| Feature | **AnythingLLM Workspace Agent** | **qdrant-rag MCP Server** |\n|--------|-------------------------------|---------------------------|\n| **Chunking Strategy** | Recursive text splitting with **6,600-character chunks** and **1,"
       }
     ],
     "D10": [
       {
         "run": 1,
-        "word_count": 249,
-        "text": "The agent should not proceed to port 6334 — it is not a valid endpoint for rag_search. The qdrant-rag MCP server uses port 6333 (not 6334) for all RAG operations. Port 6334 is the gRPC port for the Qdrant container (`anyloom-qdrant`) and is not accessible via HTTP or the MCP server's API.\n\nIf `rag_search` returns zero results on port 6333, the agent follows the decision cascade by descending to Tier 2: **Context7** (via `resolve-library-id` → `get-library-docs`), then Tier 3: **Tavily**, and fin"
+        "word_count": 337,
+        "text": "If `rag_search` returns zero results on port 6334, the agent should **not** proceed to the next tier of the decision cascade — instead, it must **diagnose the root cause** before escalating.\n\n### Why?\nThe decision cascade assumes that **each tier is a valid, working source**. If `rag_search` fails (returns zero results), it does **not** mean the answer is missing — it means the **system is misconfigured or degraded**. Escalating to Tavily or Fetch without diagnosing the failure would be a **fail"
       },
       {
         "run": 2,
-        "word_count": 249,
-        "text": "The agent should not proceed to port 6334 — it is not a valid endpoint for `rag_search`. The qdrant-rag MCP server uses port 6333 (not 6334) for all RAG operations. Port 6334 is the gRPC port for the Qdrant container (`anyloom-qdrant`) and is not accessible via HTTP or the MCP server's API.\n\nIf `rag_search` returns zero results on port 6333, the agent follows the decision cascade by descending to Tier 2: **Context7** (via `resolve-library-id` → `get-library-docs`), then Tier 3: **Tavily**, and f"
+        "word_count": 337,
+        "text": "If `rag_search` returns zero results on port 6334, the agent should **not** proceed to the next tier of the decision cascade — instead, it must **diagnose the root cause** before escalating.\n\n### Why?\nThe decision cascade assumes that **each tier is a valid, working source**. If `rag_search` fails (returns zero results), it does **not** mean the answer is missing — it means the **system is misconfigured or degraded**. Escalating to Tavily or Fetch without diagnosing the failure would be a **fail"
       },
       {
         "run": 3,
-        "word_count": 249,
-        "text": "The agent should not proceed to port 6334 — it is not a valid endpoint for `rag_search`. The qdrant-rag MCP server uses port 6333 (not 6334) for all RAG operations. Port 6334 is the gRPC port for the Qdrant container (`anyloom-qdrant`) and is not accessible via HTTP or the MCP server's API.\n\nIf `rag_search` returns zero results on port 6333, the agent follows the decision cascade by descending to Tier 2: **Context7** (via `resolve-library-id` → `get-library-docs`), then Tier 3: **Tavily**, and f"
+        "word_count": 337,
+        "text": "If `rag_search` returns zero results on port 6334, the agent should **not** proceed to the next tier of the decision cascade — instead, it must **diagnose the root cause** before escalating.\n\n### Why?\nThe decision cascade assumes that **each tier is a valid, working source**. If `rag_search` fails (returns zero results), it does **not** mean the answer is missing — it means the **system is misconfigured or degraded**. Escalating to Tavily or Fetch without diagnosing the failure would be a **fail"
       }
     ]
   },
   "analysis": {
     "D3": {
-      "min": 209,
-      "max": 209,
-      "avg": 209.0,
+      "min": 548,
+      "max": 548,
+      "avg": 548.0,
       "spread": 0,
       "verdict": "Deterministic"
     },
     "D4": {
-      "min": 100,
-      "max": 100,
-      "avg": 100.0,
+      "min": 262,
+      "max": 262,
+      "avg": 262.0,
       "spread": 0,
       "verdict": "Deterministic"
     },
     "D5": {
-      "min": 88,
-      "max": 88,
-      "avg": 88.0,
+      "min": 90,
+      "max": 90,
+      "avg": 90.0,
       "spread": 0,
       "verdict": "Deterministic"
     },
     "D6": {
-      "min": 63,
-      "max": 63,
-      "avg": 63.0,
+      "min": 48,
+      "max": 48,
+      "avg": 48.0,
       "spread": 0,
       "verdict": "Deterministic"
     },
     "D7": {
-      "min": 145,
-      "max": 145,
-      "avg": 145.0,
+      "min": 375,
+      "max": 375,
+      "avg": 375.0,
       "spread": 0,
       "verdict": "Deterministic"
     },
     "D8": {
-      "min": 213,
-      "max": 213,
-      "avg": 213.0,
+      "min": 246,
+      "max": 246,
+      "avg": 246.0,
       "spread": 0,
       "verdict": "Deterministic"
     },
     "D9": {
-      "min": 337,
-      "max": 337,
-      "avg": 337.0,
+      "min": 459,
+      "max": 459,
+      "avg": 459.0,
       "spread": 0,
       "verdict": "Deterministic"
     },
     "D10": {
-      "min": 249,
-      "max": 249,
-      "avg": 249.0,
+      "min": 337,
+      "max": 337,
+      "avg": 337.0,
       "spread": 0,
       "verdict": "Deterministic"
     }

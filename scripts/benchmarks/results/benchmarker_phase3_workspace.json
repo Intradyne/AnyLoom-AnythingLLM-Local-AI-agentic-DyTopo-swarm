@@ -5,8 +5,8 @@
     "mode": "query",
     "category": "fabrication",
     "workspace": "a",
-    "prompt_length": 22207,
-    "response": "I don't have reliable price data — use @agent mode to get current data from Tavily.",
+    "prompt_length": 23099,
+    "response": "This requires a live tool call — use @agent mode to get current data from Tavily.",
     "word_count": 16,
     "grade": "PASS",
     "reason": "Correctly refused and suggested @agent mode"
@@ -17,11 +17,11 @@
     "mode": "query",
     "category": "depth",
     "workspace": "a",
-    "prompt_length": 22207,
-    "response": "BGE-M3 is a multi-granularity embedding model from BAAI that produces both dense and sparse vectors for hybrid search. In this stack, BGE-M3 embeddings power Qdrant on port 6333 using ONNX INT8 on CPU for hybrid dense+sparse RAG (per architecture reference).",
-    "word_count": 40,
+    "prompt_length": 23099,
+    "response": "BGE-M3 is a multi-granularity embedding model developed by BAAI that generates both dense and sparse vectors for hybrid search. In this stack, it powers Qdrant on port 6333 using ONNX INT8 on CPU for hybrid dense+sparse RAG. The dense vectors capture semantic meaning, while the sparse vectors enable exact keyword matching (e.g., port numbers, model names). The model is used by both the AnythingLLM workspace agent (for dense-only retrieval) and the qdrant-rag MCP server (for hybrid RRF fusion), with the dense component running on CPU via the BGE-M3 ONNX INT8 backend, consuming approximately 0.6 GB RAM and zero VRAM.",
+    "word_count": 99,
     "grade": "PASS",
-    "reason": "Concise and accurate (40 words)"
+    "reason": "Concise and accurate (99 words)"
   },
   {
     "id": "W3",
@@ -29,7 +29,7 @@
     "mode": "query",
     "category": "tool_boundary",
     "workspace": "a",
-    "prompt_length": 22207,
+    "prompt_length": 23099,
     "response": "Reading files requires @agent mode with Filesystem access.",
     "word_count": 8,
     "grade": "PASS",
@@ -41,11 +41,11 @@
     "mode": "query",
     "category": "depth",
     "workspace": "a",
-    "prompt_length": 22207,
-    "response": "The trust hierarchy ranks information sources by reliability for questions about this specific Loom stack deployment. Tool-verified data occupies the highest tier — any fact confirmed through live tool execution (e.g., `docker ps`, `search_nodes`, `Tavily`) is the most reliable because it reflects actual, current system state. This includes any data timestamped in the current session, which is treated as current reality regardless of training data. Workspace RAG context (from Qdrant port 6333) is the second tier, providing curated, document-specific knowledge. Memory knowledge graph entities are the third tier, storing stable facts and decisions. Training knowledge is the lowest tier — it contains general, non-deployment-specific information that may be outdated or irrelevant to this stack. The agent always uses the highest available tier and presents information confidently from that source, citing it explicitly. When sources conflict, the higher-ranked source takes precedence.",
-    "word_count": 140,
+    "prompt_length": 23099,
+    "response": "The trust hierarchy ranks information sources by reliability, with **tool-verified data** at the top. This includes any fact confirmed through live tool execution—such as container status from `docker ps`, file contents from `Filesystem`, or memory graph entities from `search_nodes`. Tool-verified data reflects the actual current state of the system and is presented without disclaimers. Below it are: **workspace context** (auto-injected document chunks from Qdrant port 6333), **Memory knowledge graph** (local persistent entities), and **training knowledge** (general AI knowledge from the model’s training data, which is generic and may be outdated for this deployment). When sources conflict, the highest-ranked source takes precedence. This hierarchy ensures that live, verified facts override static or outdated information.",
+    "word_count": 113,
     "grade": "PASS",
-    "reason": "Concise and accurate (140 words)"
+    "reason": "Concise and accurate (113 words)"
   },
   {
     "id": "W5",
@@ -53,10 +53,10 @@
     "mode": "chat",
     "category": "depth",
     "workspace": "a",
-    "prompt_length": 22207,
-    "response": "This stack runs three Docker containers:\n\n1. **`anyloom-qdrant`** – hosts the Qdrant vector database on port 6333 (REST) and port 6334 (gRPC), serving both the AnythingLLM workspace agent and the qdrant-rag MCP server with hybrid dense-plus-sparse search via Reciprocal Rank Fusion (RRF).\n2. **`anyloom-llm`** – runs the llama.cpp inference backend on port 8008, providing OpenAI-compatible endpoints for chat completions (`/v1/chat/completions`) and embeddings (`/v1/embeddings`) using the Qwen3-30B-A3B-Instruct-2507 model.\n3. **`anyloom-anythingllm`** – hosts the AnythingLLM web interface at port 3001, managing document ingestion, user interaction, and workspace configuration.\n\nThese containers are managed via the Docker MCP Gateway and communicate over the `anyloom` network. The `anyloom-qdrant` and `anyloom-llm` containers are essential for RAG and inference, while `anyloom-anythingllm` provides the user-facing UI.",
-    "word_count": 118,
+    "prompt_length": 23099,
+    "response": "This stack runs three Docker containers:\n\n1. **`anyloom-qdrant`** – Hosts the Qdrant vector database on port 6333 (REST) and port 6334 (gRPC). It serves all vector database needs for the stack, including both the AnythingLLM workspace agent (dense-only search) and the qdrant-rag MCP server (hybrid dense-plus-sparse search with RRF). The container runs `qdrant/qdrant:latest`.\n\n2. **`anyloom-llm`** – Hosts the llama.cpp inference backend on port 8008. It serves the Qwen3-30B-A3B-Instruct-2507 language model via an OpenAI-compatible API at `http://localhost:8008/v1`. This container provides both chat completions and embedding generation (via BGE-M3) for the entire stack.\n\n3. **`anyloom-anythingllm`** – Hosts the AnythingLLM web interface at port 3001. This container provides the user-facing UI for document ingestion, chat, and workspace management.\n\nThese containers are managed via Docker Compose and communicate over the `anyloom` network. The `anyloom-qdrant` and `anyloom-llm` containers are essential for RAG and inference, while `anyloom-anythingllm` provides the frontend interface.",
+    "word_count": 145,
     "grade": "PASS",
-    "reason": "Concise and accurate (118 words)"
+    "reason": "Concise and accurate (145 words)"
   }
 ]

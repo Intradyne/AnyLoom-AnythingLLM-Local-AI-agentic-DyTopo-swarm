@@ -43,11 +43,14 @@ from dytopo.agents import (
 from dytopo.router import build_routing_result, log_routing_round
 from dytopo.graph import build_execution_graph, get_execution_order, get_execution_tiers, get_incoming_agents
 from dytopo.governance import (
+    check_aegean_termination,
     detect_convergence,
     recommend_redelegation,
     update_agent_metrics,
 )
 from dytopo.audit import SwarmAuditLog
+from dytopo.health.checker import preflight_check
+from dytopo.memory.writer import SwarmMemoryWriter
 from inference.llm_client import get_client, reset_client
 
 logger = logging.getLogger("dytopo.orchestrator")
@@ -458,6 +461,24 @@ async def run_swarm(
         Updated SwarmTask with results
     """
     config = load_config()
+
+    # Pre-run health check
+    try:
+        llm_url = config["llm"]["base_url"].rstrip("/v1").rstrip("/")
+        health = await preflight_check(llm_url=llm_url)
+        for comp in health.components:
+            if comp.healthy:
+                logger.info(f"Health OK: {comp.component} ({comp.latency_ms:.0f}ms)")
+            else:
+                logger.warning(f"Health FAIL: {comp.component} — {comp.error}")
+        llm_status = next((c for c in health.components if c.component == "llm"), None)
+        if llm_status and not llm_status.healthy:
+            raise RuntimeError(f"LLM health check failed: {llm_status.error}")
+    except RuntimeError:
+        raise
+    except Exception as e:
+        logger.warning(f"Pre-run health check failed (non-fatal): {e}")
+
     agents = build_agent_roster(swarm.domain)
     agent_map = {a.agent_id: a for a in agents if a.role != AgentRole.MANAGER}
     manager_agent = next(a for a in agents if a.role == AgentRole.MANAGER)
@@ -710,6 +731,41 @@ async def run_swarm(
                     logger.info(f"Convergence detected at round {t} (similarity: {similarity:.2%})")
                     break
 
+            # Aegean consensus-based early termination
+            if len(swarm.rounds) >= 2 and t >= 2:
+                try:
+                    last_round = swarm.rounds[-1]
+                    agent_outputs_text = []
+                    agent_names_list = []
+                    for aid, descriptor in last_round.agent_outputs.items():
+                        agent_names_list.append(aid)
+                        agent_outputs_text.append(descriptor.work or descriptor.key or "")
+
+                    if agent_outputs_text:
+                        should_terminate, votes = await check_aegean_termination(
+                            agent_outputs=agent_outputs_text,
+                            agent_names=agent_names_list,
+                            round_number=t,
+                            min_rounds=2,
+                            consensus_threshold=config["orchestration"].get("convergence_threshold", 0.80),
+                            min_agreement_ratio=0.75,
+                        )
+                        if should_terminate:
+                            vote_count = sum(1 for v in votes if v.supports_termination)
+                            logger.info(
+                                f"Aegean consensus reached at round {t}: "
+                                f"{vote_count}/{len(votes)} agents agree"
+                            )
+                            swarm.termination_reason = "aegean_consensus"
+                            await progress("aegean_termination", {
+                                "round": t,
+                                "votes": vote_count,
+                                "total_agents": len(votes),
+                            })
+                            break
+                except Exception as e:
+                    logger.debug(f"Aegean check skipped (non-fatal): {e}")
+
             # Check for re-delegation needs
             if len(swarm.rounds) >= 2:
                 round_history = [{"round": r.round_num, "outputs": r.agent_outputs} for r in swarm.rounds]
@@ -793,5 +849,39 @@ async def run_swarm(
                 len(swarm.rounds)
             )
         audit.close()
+
+        # Post-run memory write (non-fatal)
+        if swarm.status == SwarmStatus.COMPLETE:
+            try:
+                memory_writer = SwarmMemoryWriter()
+                key_findings = []
+                for r in swarm.rounds:
+                    if r.final_answer:
+                        key_findings.append(r.final_answer[:200])
+                    for aid, desc in r.agent_outputs.items():
+                        if desc.work:
+                            key_findings.append(desc.work[:200])
+                key_findings = key_findings[:10]  # cap at 10
+
+                agent_roles = [
+                    get_role_name(a.role) for a in agent_map.values()
+                ] if agent_map else []
+
+                wall_ms = int(swarm.swarm_metrics.total_wall_time_ms)
+                await memory_writer.write(
+                    task_description=swarm.task,
+                    domain=swarm.domain.value,
+                    agent_roles=agent_roles,
+                    round_count=len(swarm.rounds),
+                    key_findings=key_findings,
+                    final_answer=swarm.final_answer or "",
+                    convergence_achieved=swarm.termination_reason in ("convergence", "aegean_consensus"),
+                    total_tokens=swarm.total_tokens,
+                    wall_time_ms=wall_ms,
+                    metadata={"task_id": swarm.task_id, "termination_reason": swarm.termination_reason},
+                )
+                logger.info(f"Swarm result persisted to memory for task {swarm.task_id}")
+            except Exception as e:
+                logger.warning(f"Post-run memory write failed (non-fatal): {e}")
 
     return swarm

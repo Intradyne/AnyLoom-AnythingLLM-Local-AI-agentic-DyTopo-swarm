@@ -303,7 +303,7 @@ This script:
 - Sets system-wide defaults: LLM provider (Generic OpenAI → llama.cpp), embedding engine (BGE-M3 via llama.cpp GPU container), vector DB (Qdrant), max generation tokens (4096), chunk size (2500 chars, ~625 tokens via EmbeddingModelMaxChunkLength -- the only effective chunk control), and the default system prompt
 - Creates an `AnyLoom` workspace
 - Uploads and embeds RAG reference documents from `rag-docs/anythingllm/*.md` into the workspace's Qdrant vector store (idempotent — skips files already uploaded/embedded)
-- Pushes workspace settings (temp=0.3, topN=16, history=30, system prompt)
+- Pushes workspace settings (temp=0.3, topN=8, history=30, system prompt)
 - Verifies all settings took effect
 - Runs a smoke-test query to verify end-to-end connectivity (now with RAG context!)
 
@@ -403,18 +403,18 @@ pip install -r requirements-dytopo.txt
 Test the full stack with benchmarks:
 
 ```bash
-python scripts/benchmarks/bench_run_all.py
+ANYTHINGLLM_API_KEY=your-key python scripts/benchmarks/bench_run_all.py
 ```
 
 This runs 6 benchmark phases testing:
-- Phase 1: Basic explanations
-- Phase 2: Adversarial edge cases
-- Phase 3: Workspace RAG retrieval
-- Phase 4: Stability and consistency
-- Phase 5: Direct llama.cpp API calls
-- Phase 6: Showcase demonstrations
+- Phase 1: Explanation tier (depth calibration, ≤150w)
+- Phase 2: Adversarial fabrication (price hallucination resistance)
+- Phase 3: Cross-workspace parity (RAG retrieval)
+- Phase 4: Depth stability (determinism across 3 runs)
+- Phase 5: Direct llama.cpp API validation
+- Phase 6: Showcase gallery (curated responses)
 
-Results are saved to `scripts/benchmarks/results/`.
+Results are saved to `scripts/benchmarks/results/`. Current score: **15/20 (75%)**. See [benchmark results](scripts/benchmarks/docs/benchmark-results-showcase.md) for details.
 
 ---
 
