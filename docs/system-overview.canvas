@@ -13,7 +13,8 @@
 		{"id":"dytopo","type":"text","text":"## DyTopo Swarm\n\n`src/dytopo/` — 8 core modules + 6 sub-packages\nAsync parallel orchestration (asyncio.gather)\nSemaphore-controlled concurrency (llama.cpp default)\nSemantic routing: MiniLM-L6-v2, cosine sim, threshold τ\nTopological tiers for parallel-within-tier execution\nDomains: code · math · general\nOptional RAG context pre-fetch → Manager (1 retrieval, 0 per-agent)\n\nSee [swarm-overview.canvas](swarm-overview.canvas) for module details","x":-780,"y":21,"width":360,"height":419,"color":"3"},
 		{"id":"rag_sources","type":"text","text":"## RAG Document Sources\n\n**Multi-source indexing → Qdrant 6333:**\n6 docs in `rag-docs/`\n- anythingllm/ (6 docs)\nHybrid dense+sparse indexing\nSHA-256 content-hash dedup\nsource_dir payload filtering","x":-1140,"y":-300,"width":360,"height":260,"color":"6"},
 		{"id":"embedding","type":"text","text":"## llama.cpp Embedding\n\nBGE-M3 Q8_0 GGUF (GPU, AnythingLLM)\nPort 8009 (host) / 8080 (container)\nOpenAI-compatible: /v1/embeddings\n1024-dim dense vectors, 8192 context\n~605 MB model, ~635 MB VRAM\n\nContainer: anyloom-embedding","x":-780,"y":-920,"width":360,"height":240,"color":"4"},
-		{"id":"agent_skills","type":"text","text":"## Agent Skills (Custom)\n\nRun inside AnythingLLM container\nLLM selects tool via function calling\n\n**asset-price** — yahoo-finance2 v3\nStocks, crypto, commodities, indices, ETFs\nAlias table + search fallback\n\n**smart-web-reader** — 3-tier extraction\nDefuddle → Readability+Turndown → regex\n8K char truncation, 15s timeout\n\n📍 [skills/](../skills/)","x":795,"y":-960,"width":310,"height":410,"color":"2"}
+		{"id":"agent_skills","type":"text","text":"## Agent Skills (Custom)\n\nRun inside AnythingLLM container\nLLM selects tool via function calling\n\n**asset-price** — yahoo-finance2 v3\nStocks, crypto, commodities, indices, ETFs\nAlias table + search fallback\n\n**smart-web-reader** — 3-tier extraction\nDefuddle → Readability+Turndown → regex\n8K char truncation, 15s timeout\n\n📍 [skills/](../skills/)","x":795,"y":-960,"width":310,"height":410,"color":"2"},
+		{"id":"fc996cdf5d02ea4a","x":-1644,"y":-707,"width":250,"height":60,"type":"text","text":"Dashboard"}
 	],
 	"edges":[
 		{"id":"e1","fromNode":"user_input","fromSide":"bottom","toNode":"anythingllm","toSide":"top","color":"1","label":"chat / query"},
@@ -36,6 +37,10 @@
 		{"id":"a85278928ec47069","fromNode":"docker_mcp","fromSide":"top","toNode":"n8n","toSide":"bottom","color":"5"},
 		{"id":"e_allm_embed","fromNode":"anythingllm","fromSide":"left","toNode":"embedding","toSide":"right","color":"4","label":"embed chunks"},
 		{"id":"e_embed_qdrant","fromNode":"embedding","fromSide":"bottom","toNode":"qdrant","toSide":"top","color":"4","label":"embeddings"},
-		{"id":"e_allm_skills","fromNode":"anythingllm","fromSide":"right","toNode":"agent_skills","toSide":"left","color":"2","label":"@agent tools"}
+		{"id":"e_allm_skills","fromNode":"anythingllm","fromSide":"right","toNode":"agent_skills","toSide":"left","color":"2","label":"@agent tools"},
+		{"id":"49cf02cce4fe8e7a","fromNode":"fc996cdf5d02ea4a","fromSide":"right","toNode":"embedding","toSide":"left"},
+		{"id":"7cb7d4975b891c5a","fromNode":"fc996cdf5d02ea4a","fromSide":"right","toNode":"dytopo","toSide":"left"},
+		{"id":"2eb4e486630f8702","fromNode":"fc996cdf5d02ea4a","fromSide":"right","toNode":"anythingllm","toSide":"left"},
+		{"id":"3b5816d5b1c5f16b","fromNode":"fc996cdf5d02ea4a","fromSide":"right","toNode":"lm_studio","toSide":"left"}
 	]
 }

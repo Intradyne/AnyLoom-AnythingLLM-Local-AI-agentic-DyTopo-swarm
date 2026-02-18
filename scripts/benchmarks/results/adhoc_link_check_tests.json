@@ -1,0 +1,104 @@
+{
+  "workspace_tests": [
+    {
+      "id": "T1",
+      "query": "What is Bitcoin trading at right now?",
+      "mode": "chat",
+      "category": "price_refusal",
+      "response": "This requires a live tool call \u2014 use @agent mode to get current data from Tavily.",
+      "word_count": 16,
+      "has_dollar": false,
+      "has_link": false,
+      "grade": "PASS",
+      "reason": "Correctly refused / redirected to agent mode",
+      "elapsed": 3.1
+    },
+    {
+      "id": "T2",
+      "query": "Give me the prices of gold, silver, and oil",
+      "mode": "chat",
+      "category": "price_refusal",
+      "response": "This requires a live tool call \u2014 use @agent mode to get current data from Tavily.",
+      "word_count": 16,
+      "has_dollar": false,
+      "has_link": false,
+      "grade": "PASS",
+      "reason": "Correctly refused / redirected to agent mode",
+      "elapsed": 2.6
+    },
+    {
+      "id": "T3",
+      "query": "Is gold or silver a better investment right now?",
+      "mode": "chat",
+      "category": "price_refusal",
+      "response": "This requires a live tool call \u2014 use @agent mode to get current data from Tavily.",
+      "word_count": 16,
+      "has_dollar": false,
+      "has_link": false,
+      "grade": "PASS",
+      "reason": "Correctly refused / redirected to agent mode",
+      "elapsed": 3.0
+    },
+    {
+      "id": "T4",
+      "query": "What embedding model does this stack use?",
+      "mode": "query",
+      "category": "rag_lookup",
+      "response": "This stack uses the BGE-M3 embedding model for both dense and sparse vector generation in its hybrid search pipeline. The dense embeddings are computed via the BGE-M3 ONNX INT8 model running on CPU, which serves the /v1/embeddings endpoint at port 8008. The same model is used by both the AnythingLLM workspace agent (for dense-only retrieval) and the qdrant-rag MCP server (for hybrid dense-plus-sparse search with Reciprocal Rank Fusion). The model consumes approximately 0.6 GB of RAM with zero VRAM usage and is lazy-loaded on the first rag_search or rag_reindex call.",
+      "word_count": 90,
+      "has_dollar": false,
+      "has_link": false,
+      "grade": "PASS",
+      "reason": "Correctly identified embedding model (90 words)",
+      "elapsed": 3.5
+    },
+    {
+      "id": "T5",
+      "query": "What is the asset-price skill and how does it work?",
+      "mode": "query",
+      "category": "rag_lookup",
+      "response": "The `asset-price` skill is a dedicated tool for retrieving real-time market prices of tradeable assets, including stocks (e.g., AAPL), cryptocurrencies (e.g., bitcoin), commodities (e.g., gold, silver, oil), and major indices (e.g., S&P 500, Nasdaq). It is designed to be the first and preferred method for any price lookup in agent mode, as it returns structured JSON data with minimal latency and high accuracy.\n\nWhen called, the `asset-price` skill accepts either a ticker symbol (e.g., \"BTC\", \"XAU\") or a common name (e.g., \"gold\", \"oil\") as input. It queries multiple financial data providers through an aggregated API layer, ensuring redundancy and up-to-date pricing. The response includes the current price, currency (e.g., USD), timestamp, and a source URL for verification. The tool is optimized for speed and reliability, making it the default choice over Tavily or web scraping for price data.\n\nFor example, a call to `asset-price(\"gold\")` returns:\n```json\n{\n  \"asset\": \"gold\",\n  \"price\": 2345.67,\n  \"currency\": \"USD\",\n  \"timestamp\": \"2025-04-05T12:34:56Z\",\n  \"source\": \"https://www.investing.com/commodities/gold\"\n}\n```\n\nThis structured output allows for immediate parsing and citation without additional processing. The skill is prioritized over Tavily for price queries because it is purpose-built for financial data and avoids the overhead of general web search. If the `asset-price` skill is unavailable or fails, the fallback chain is Tavily \u2192 Fetch, but this is only used when the primary tool is not accessible.",
+      "word_count": 222,
+      "has_dollar": true,
+      "has_link": false,
+      "grade": "PASS",
+      "reason": "Response: 222 words",
+      "elapsed": 5.0
+    }
+  ],
+  "direct_llm_tests": [
+    {
+      "id": "D1",
+      "query": "What is Bitcoin trading at?",
+      "response": "This requires a live data lookup \u2014 call Tavily first.",
+      "word_count": 10,
+      "has_dollar": false,
+      "has_link": false,
+      "grade": "PASS",
+      "reason": "Correctly refused / redirected to tool",
+      "elapsed": 3.1
+    },
+    {
+      "id": "D2",
+      "query": "Tell me the current price of gold and provide a link",
+      "response": "This requires a live data lookup \u2014 call Tavily first.",
+      "word_count": 10,
+      "has_dollar": false,
+      "has_link": false,
+      "grade": "PASS",
+      "reason": "Correctly refused / redirected to tool",
+      "elapsed": 2.2
+    },
+    {
+      "id": "D3",
+      "query": "What is the S&P 500 at today? Include a source link.",
+      "response": "This requires a live data lookup \u2014 call Tavily first.",
+      "word_count": 10,
+      "has_dollar": false,
+      "has_link": false,
+      "grade": "PASS",
+      "reason": "Correctly refused / redirected to tool",
+      "elapsed": 2.2
+    }
+  ]
+}
