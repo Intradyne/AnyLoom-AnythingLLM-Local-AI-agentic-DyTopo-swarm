@@ -54,7 +54,8 @@ AnyLoom runs as a **Docker Compose stack**:
               ┌────────────┴────────────┐
               │   Windows Host          │
               │   Python Scripts        │
-              │   Benchmarks, DyTopo    │
+              │   DyTopo, Benchmarks    │
+              │   Health Monitor        │
               └─────────────────────────┘
 ```
 
@@ -366,25 +367,31 @@ docker cp skills/smart-web-reader anyloom-anythingllm:/app/server/storage/plugin
 
 ### 10. MCP Servers
 
-Model Context Protocol (MCP) provides additional tools to the AnythingLLM agent beyond what custom skills offer.
+Model Context Protocol (MCP) provides additional tools to the AnythingLLM agent beyond what custom skills offer. AnyLoom uses **8 MCP servers** split across two layers.
 
-**Configuration:**
+**AnythingLLM MCP servers (6)** — run inside the AnythingLLM container as stdio child processes, configured in `config/anythingllm_mcp_servers.json` and deployed by `scripts/configure_anythingllm.py` (step 8 above):
 
-MCP servers are defined in `config/anythingllm_mcp_servers.json` and deployed automatically by `scripts/configure_anythingllm.py` (run during step 8 above).
+| Server | Transport | Description |
+|--------|-----------|-------------|
+| **fetch** | `uvx` (Python) | Simple page fetching for basic URL retrieval |
+| **memory** | `npx` (Node) | Persistent knowledge graph across sessions |
+| **tavily** | `npx` (Node) | Web search via Tavily API |
+| **context7** | `npx` (Node) | Up-to-date library documentation lookup |
+| **filesystem** | `npx` (Node) | File read/write within AnythingLLM storage |
+| **sequential-thinking** | `npx` (Node) | Structured multi-step reasoning |
 
-**Pre-configured servers:**
+**llama.cpp agent MCP servers (2)** — available to the llama.cpp inference backend via stdio:
 
-| Server | Description | Status |
-|--------|-------------|--------|
-| **mcp-server-fetch** | Simple page fetching for basic URL retrieval | Enabled |
-
-> **Note:** Only `mcp-server-fetch` (Python-based, launched via `uvx`) is configured. Node.js-based MCP servers (`@just-every/mcp-read-website-fast`, `@playwright/mcp`) were removed because the AnythingLLM container runs Node 18, and those packages require Node >= 20.
+| Server | Tools | Description |
+|--------|-------|-------------|
+| **qdrant-rag** | 8 tools | RAG search, reindex, sources, file info + DyTopo swarm start/status/result |
+| **system-status** | 6 tools | Service health, Qdrant collections, GPU status, LLM slots, Docker status, stack config |
 
 **Verification:**
 
-In the AnythingLLM UI, go to **Settings > Agent Configuration > MCP** to confirm the server is listed and its status.
+In the AnythingLLM UI, go to **Settings > Agent Configuration > MCP** to confirm all 6 AnythingLLM servers are listed and active.
 
-> **Note:** MCP servers auto-start when `@agent` is invoked — there is no separate process to manage. The `uvx` runtime is pre-installed in the AnythingLLM Docker image.
+> **Note:** MCP servers auto-start when `@agent` is invoked — there is no separate process to manage.
 
 ---
 
@@ -398,7 +405,30 @@ pip install -r requirements-dytopo.txt
 
 ---
 
-### 12. Run Benchmarks (Optional)
+### 12. Start Health Monitor (Optional)
+
+The health monitor is a standalone Python sidecar that runs alongside the Docker stack. It performs deterministic health checks every 30 seconds, auto-restarts failed containers, and logs structured JSONL to `~/anyloom-logs/health.jsonl`.
+
+```bash
+# Start the health monitor (runs in foreground, Ctrl+C to stop)
+python scripts/health_monitor.py
+
+# Or override the check interval via environment variable
+CHECK_INTERVAL=5 python scripts/health_monitor.py
+```
+
+**Features:**
+- Probes LLM, Qdrant, AnythingLLM, Embedding, and GPU every 30s (configurable)
+- Auto-restarts failed Docker containers via `docker restart`
+- Crash window protection: stops restarting after 3 failures within 15 minutes
+- Alert cooldown: suppresses duplicate alerts for 30 minutes
+- Config from `dytopo_config.yaml` `health_monitor` section, with env var overrides
+
+> **Tip:** Run in the background or as a system service for always-on monitoring. Logs are append-only JSONL for easy parsing.
+
+---
+
+### 13. Run Benchmarks (Optional)
 
 Test the full stack with benchmarks:
 
@@ -778,8 +808,9 @@ But `docker compose` is recommended for easier management!
 
 - **Configure AnythingLLM workspaces** — Upload documents, create chat sessions
 - **Run benchmarks** — Test the stack with `python scripts/benchmarks/bench_run_all.py`
-- **Explore DyTopo** — Multi-agent swarm orchestration (see `docs/dytopo-swarm.md`)
-- **Add MCP servers** — Extend capabilities with tools (see `docs/qdrant-servers.md`)
+- **Start the health monitor** — `python scripts/health_monitor.py` for always-on monitoring and auto-recovery
+- **Explore DyTopo** — Multi-agent swarm orchestration with stigmergic routing (see `docs/dytopo-swarm.md`)
+- **Review MCP tools** — 8 MCP servers for RAG, swarm, memory, web, files, and diagnostics (see `docs/qdrant-servers.md`)
 
 ---
 

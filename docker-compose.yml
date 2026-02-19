@@ -136,6 +136,7 @@ services:
       - GID=${ANYTHINGLLM_GID:-1000}
       - NODE_OPTIONS=--dns-result-order=ipv4first  # Qdrant binds IPv4 only
       - ANYTHINGLLM_CHROMIUM_ARGS=--no-sandbox,--disable-setuid-sandbox,--disable-dev-shm-usage,--disable-gpu,--no-zygote,--disable-software-rasterizer
+      - MCP_NO_COOLDOWN=1  # Allow agent to call the same MCP tool multiple times with different args
     networks:
       - anyloom
     depends_on:

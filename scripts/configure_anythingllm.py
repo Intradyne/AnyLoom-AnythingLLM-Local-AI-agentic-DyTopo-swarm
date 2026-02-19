@@ -407,6 +407,11 @@ def update_workspace(api_key, slug):
             "There is no relevant information in this workspace "
             "to answer your query."
         ),
+        # Agent provider — must be set explicitly on the workspace so @agent
+        # mode knows which LLM to use (workspace.agentProvider takes priority
+        # over system LLM_PROVIDER in AnythingLLM's agent resolution order).
+        "agentProvider": "generic-openai",
+        "agentModel": "gpt-4",  # llama.cpp --alias
     }
     if prompt_text:
         settings["openAiPrompt"] = prompt_text

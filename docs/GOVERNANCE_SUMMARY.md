@@ -4,7 +4,7 @@
 
 ## Architecture
 
-The governance module is one of 8 core modules in the `src/dytopo/` package (which also includes sub-packages for observability, safeguards, messaging, routing, and delegation):
+The governance module is one of 9 core modules in the `src/dytopo/` package (which also includes sub-packages for observability, safeguards, messaging, routing, delegation, and documentation):
 
 | Module | Role |
 |--------|------|
@@ -12,9 +12,10 @@ The governance module is one of 8 core modules in the `src/dytopo/` package (whi
 | `config.py` | YAML configuration with `convergence_threshold` setting |
 | `agents.py` | System prompts, JSON schemas, domain agent rosters |
 | `router.py` | MiniLM-L6-v2 embedding, cosine similarity, threshold routing |
+| `stigmergic_router.py` | Trace-aware topology: Qdrant-persisted swarm traces, time-decayed boost matrix |
 | `graph.py` | NetworkX DAG, cycle breaking, topological sort |
 | `orchestrator.py` | Main loop — calls governance functions after each round |
-| **`governance.py`** | **Convergence, stalling, re-delegation (this module)** |
+| **`governance.py`** | **Convergence, stalling, re-delegation, Aegean consensus (this module)** |
 | `audit.py` | JSONL audit logging for all events |
 
 ## How Governance Integrates with the Orchestrator
@@ -22,9 +23,11 @@ The governance module is one of 8 core modules in the `src/dytopo/` package (whi
 The orchestrator (`run_swarm()`) calls governance functions at specific points:
 
 1. **After each round (t >= 3)**: `detect_convergence()` checks if agent outputs have stabilized
-2. **After each round (t >= 2)**: `recommend_redelegation()` identifies stalling or failing agents
-3. **On convergence**: Sets `swarm.termination_reason = "convergence"` and breaks early
-4. **On re-delegation**: Logs recommendations via `audit.redelegation()` and increments `swarm_metrics.redelegations`
+2. **After each round (t >= 2)**: `check_aegean_termination()` runs embedding-based consensus vote
+3. **After each round (t >= 2)**: `recommend_redelegation()` identifies stalling or failing agents
+4. **On convergence**: Sets `swarm.termination_reason = "convergence"` and breaks early
+5. **On Aegean consensus**: Sets `swarm.termination_reason = "aegean_consensus"` and breaks early
+6. **On re-delegation**: Logs recommendations via `audit.redelegation()` and increments `swarm_metrics.redelegations`
 
 ## Functions
 
@@ -46,6 +49,18 @@ The orchestrator (`run_swarm()`) calls governance functions at specific points:
 - Identifies stalling, failing, and isolated agents
 - Returns `[{agent_id, reason, recommendation, severity}]`
 - Called by orchestrator after round 2+
+
+### `compute_consensus_matrix(agent_outputs, model)`
+- Embeds all agent outputs via MiniLM-L6-v2 and computes pairwise cosine similarity
+- Returns NxN similarity matrix used by Aegean termination check
+- Non-fatal — errors return None
+
+### `check_aegean_termination(agent_outputs, consensus_threshold=0.85, vote_threshold=0.75)`
+- Embedding-based consensus check across agent outputs
+- Each agent "votes" to terminate if its avg similarity to others exceeds `consensus_threshold`
+- If >= `vote_threshold` (75%) of agents vote, the swarm terminates early
+- Runs after convergence detection in rounds >= 2
+- Returns `(should_terminate: bool, votes: dict, avg_similarity: float)`
 
 ### `update_agent_metrics(agent_state, round_result)`
 - Updates dict-based agent state with round results

@@ -14,7 +14,7 @@
 - 🧠 **Advanced reasoning** — Qwen3-30B MoE (30.5B params, 3.3B active) with hybrid thinking mode
 - 📚 **Hybrid RAG search** — Finds YOUR information better than pure vector search (dense + sparse retrieval)
 - 🤖 **Multi-agent swarm** — DyTopo coordination routes complex tasks to specialized agents that collaborate, with optional RAG context pre-fetch for domain grounding
-- 🛠️ **10 MCP servers** — Memory knowledge graph, web search, browser automation, file operations, code execution, RAG search, multi-agent swarm
+- 🛠️ **8 MCP servers** — Memory knowledge graph, web search, file operations, sequential thinking, RAG search, multi-agent swarm, system diagnostics
 - 🐋 **Docker-first architecture** — One command to start/stop everything. Auto-restart. Zero networking hassles.
 - 💬 **AnythingLLM UI** — Clean interface for chat, document Q&A, and workspace management
 
@@ -35,7 +35,7 @@
 | **Retrieval Quality** | ✅ Hybrid dense+sparse RAG                    | ⚠️ Dense-only embeddings        | ⚠️ Basic or no RAG        |
 | **Multi-Agent Swarm** | ✅ DyTopo routing, 3-5 agents                 | ❌ Single model per request      | ❌ Single model            |
 | **Persistent Memory** | ✅ MCP knowledge graph across sessions        | ⚠️ Limited to conversation      | ❌ No cross-session memory |
-| **Tool Ecosystem**    | ✅ 10 MCP servers (RAG, swarm, web, code, files, browser) | ⚠️ Limited, cloud-gated         | ❌ Manual integration      |
+| **Tool Ecosystem**    | ✅ 8 MCP servers (RAG, swarm, web, memory, files, diagnostics) | ⚠️ Limited, cloud-gated         | ❌ Manual integration      |
 | **Context Window**    | ✅ 131K tokens (configurable)                  | ⚠️ 128K (expensive tiers)       | ⚠️ Varies by model        |
 | **Offline Use**       | ✅ Fully functional                           | ❌ Requires internet             | ✅ Fully functional        |
 
@@ -51,8 +51,9 @@ AnyLoom runs as a **Docker Compose stack** with these services:
 - **llama.cpp LLM** (port 8008) — GPU-accelerated inference with 131K context (Qwen3-30B-A3B)
 - **llama.cpp Embedding** (port 8009) — BGE-M3 embedding server for AnythingLLM (1024-dim dense vectors)
 - **AnythingLLM** (port 3001) — Web UI for chat and document management
-- **DyTopo swarm** (Python, runs natively) — Multi-agent orchestration for complex tasks
-- **10 MCP servers** — RAG search, DyTopo swarm, memory graph, web search, browser automation, file ops, and more
+- **DyTopo swarm** (Python, runs natively) — Multi-agent orchestration with stigmergic trace-aware routing
+- **Health Monitor** (Python sidecar) — Deterministic health checks with auto-restart and crash window protection
+- **8 MCP servers** — RAG search, DyTopo swarm, memory graph, web search, file ops, system diagnostics, and more
 
 **Everything starts with one command.** Docker handles networking, GPU access, auto-restart, and data persistence.
 
@@ -64,7 +65,7 @@ AnyLoom runs as a **Docker Compose stack** with these services:
 | -------------------------------------------------- | -------------------------- |
 | Total Token Budget                                 | 131K                       |
 | System prompt                                      | ~2K                        |
-| MCP tool definitions (9 Docker + 1 qdrant-rag)     | ~3K                        |
+| MCP tool definitions (6 AnythingLLM + 2 agent)      | ~3K                        |
 | RAG snippets (16 × ~500 tokens)                    | ~8K                        |
 | Chat history (30 messages)                         | ~12K                       |
 |                             **Overhead Subtotal:** | **~25K**                   |
@@ -186,6 +187,9 @@ docker compose restart llm
 # Check status
 docker compose ps
 
+# Start the health monitor sidecar (optional, runs alongside Docker)
+python scripts/health_monitor.py
+
 # Remove everything including data (⚠️ DESTRUCTIVE)
 docker compose down -v
 ```
@@ -218,12 +222,20 @@ Reference documentation in `docs/`:
 | `config.py` | YAML configuration loader with defaults (`dytopo_config.yaml`) |
 | `agents.py` | System prompts, JSON schemas, domain rosters |
 | `router.py` | MiniLM-L6-v2 embedding, cosine similarity, threshold, degree cap |
+| `stigmergic_router.py` | Trace-aware topology: Qdrant-persisted swarm traces, time-decayed boost matrix |
 | `graph.py` | NetworkX DAG construction, cycle breaking, topological sort |
 | `orchestrator.py` | Main swarm loop with singleton inference client, Aegean termination, memory persistence |
 | `governance.py` | Convergence detection, stalling detection, re-delegation, Aegean consensus voting |
 | `audit.py` | JSONL audit logging to `~/dytopo-logs/{task_id}/` |
 | `health/checker.py` | Pre-run health probes for LLM, Qdrant, AnythingLLM, GPU |
 | `memory/writer.py` | Post-run swarm result persistence to structured storage |
+
+### Supporting Services
+
+| Component | Purpose |
+|-----------|---------|
+| `src/mcp_servers/system_status_mcp.py` | FastMCP server: 6 diagnostic tools (service_health, qdrant_collections, gpu_status, llm_slots, docker_status, stack_config) |
+| `scripts/health_monitor.py` | Standalone sidecar: periodic health checks, auto-restart via `docker restart`, crash window protection (3 attempts/15min), JSONL logging |
 
 ---
 

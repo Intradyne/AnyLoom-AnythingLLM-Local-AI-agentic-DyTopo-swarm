@@ -52,6 +52,23 @@ _DEFAULTS = {
         "connect_timeout": 10.0,
         "read_timeout": 180.0,
     },
+    "traces": {
+        "enabled": False,
+        "qdrant_url": "http://localhost:6333",
+        "collection": "swarm_traces",
+        "boost_weight": 0.15,
+        "half_life_hours": 168.0,
+        "top_k": 5,
+        "min_quality": 0.5,
+        "prune_max_age_hours": 720.0,
+    },
+    "health_monitor": {
+        "check_interval_seconds": 30,
+        "max_restart_attempts": 3,
+        "crash_window_minutes": 15,
+        "alert_cooldown_minutes": 30,
+        "log_dir": "~/anyloom-logs",
+    },
 }
 
 

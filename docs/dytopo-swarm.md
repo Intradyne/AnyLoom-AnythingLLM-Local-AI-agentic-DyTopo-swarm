@@ -4,7 +4,7 @@ DyTopo (arXiv 2602.06039) dynamically constructs agent communication topology ea
 
 ## Package Architecture
 
-DyTopo is a standalone Python package at `src/dytopo/` with 8 core modules and 6 sub-packages. The MCP server (`src/qdrant_mcp_server.py`) exposes 3 thin tools that delegate to it.
+DyTopo is a standalone Python package at `src/dytopo/` with 9 core modules and 6 sub-packages. The MCP server (`src/qdrant_mcp_server.py`) exposes 3 swarm tools (`swarm_start`, `swarm_status`, `swarm_result`) plus 5 RAG tools that delegate to it.
 
 ### Core Modules
 
@@ -14,6 +14,7 @@ DyTopo is a standalone Python package at `src/dytopo/` with 8 core modules and 6
 | `config.py` | YAML configuration loader — merges `dytopo_config.yaml` over built-in `_DEFAULTS`; includes `concurrency` section for backend selection |
 | `agents.py` | System prompts keyed by `(SwarmDomain, AgentRole)`, JSON schemas (`DESCRIPTOR_SCHEMA`, `AGENT_OUTPUT_SCHEMA`, `MANAGER_OUTPUT_SCHEMA`), prompt templates, `build_agent_roster()`, `get_system_prompt()`, `get_role_name()`, `get_worker_names()` |
 | `router.py` | Lazy singleton MiniLM-L6-v2, `embed_descriptors()`, `compute_similarity_matrix()`, `apply_threshold()`, `enforce_max_indegree()`, `build_routing_result()`, `log_routing_round()` |
+| `stigmergic_router.py` | `StigmergicRouter` class wrapping functional routing with trace-aware topology: `build_topology()` (blends similarity matrix with time-decayed historical trace boost), `deposit_trace()` (persists swarm routing patterns to Qdrant `swarm_traces` collection), `get_trace_stats()`, `prune_old_traces()`. `build_trace_edges()` helper converts routing edges to trace format. Uses 384-dim MiniLM-L6-v2 embeddings, configurable via `traces` section in config |
 | `graph.py` | `build_execution_graph()` (NetworkX DiGraph), `break_cycles()` (greedy lowest-weight removal), `get_execution_order()` (Kahn's with alphabetical tiebreak), `get_execution_tiers()` (parallel-within-tier ordering via `nx.topological_generations()`), `get_incoming_agents()` |
 | `orchestrator.py` | Backend-agnostic LLM client via `_get_llm_client()` (connects to llama.cpp on port 8008), semaphore-based concurrency via `_get_semaphore()` (8 concurrent), `_llm_call()` with tenacity retry (3 attempts, exponential backoff), `_call_manager()`, `_call_worker()`, `run_swarm()` main loop with parallelized phases via `asyncio.gather()` |
 | `governance.py` | `execute_agent_safe()`, `detect_convergence()`, `detect_stalling()`, `recommend_redelegation()`, `update_agent_metrics()`, `compute_consensus_matrix()`, `check_aegean_termination()` |
@@ -55,6 +56,21 @@ concurrency:
   # read_timeout: 180.0
 logging:
   log_dir: "~/dytopo-logs"
+traces:
+  enabled: true             # Enable stigmergic trace-aware routing
+  qdrant_url: "http://localhost:6333"
+  collection: "swarm_traces"
+  boost_weight: 0.15        # Alpha blending: S = (1-α)*S + α*B
+  half_life_hours: 168.0    # Time decay half-life (1 week)
+  top_k: 5                  # Number of historical traces to retrieve
+  min_quality: 0.5          # Quality gate for depositing traces
+  prune_max_age_hours: 720.0  # Delete traces older than 30 days
+health_monitor:
+  check_interval_seconds: 30
+  max_restart_attempts: 3
+  crash_window_minutes: 15
+  alert_cooldown_minutes: 30
+  log_dir: "~/anyloom-logs"
 ```
 
 ## Round Lifecycle
@@ -63,7 +79,7 @@ logging:
 2. **Round 1 — broadcast:** all agents see all outputs (no routing yet); agent calls are parallelized via `asyncio.gather()`
 3. **Rounds 2+ — three-phase split:**
    - Phase A: each agent generates key/query descriptors only (fast, `/no_think`, temp 0.1, 256 tokens); descriptor generation is parallelized via `asyncio.gather()`
-   - Phase B: MiniLM embeds descriptors -> cosine similarity matrix -> threshold tau -> directed graph -> cycle breaking -> topological tiers via `get_execution_tiers()`
+   - Phase B: MiniLM embeds descriptors -> cosine similarity matrix -> optional stigmergic trace boost (blends historical routing patterns via time-decayed role-pair matrix) -> threshold tau -> directed graph -> cycle breaking -> topological tiers via `get_execution_tiers()`
    - Phase C: agents execute tier-by-tier with `asyncio.gather()` within each tier; agents in the same tier run in parallel, later tiers wait for earlier tiers to complete; routed messages injected (temp 0.3, 4096 tokens)
 4. **Governance checks:** convergence detection, stalling detection, re-delegation recommendations
 5. **Audit logging:** all events logged to JSONL for observability
@@ -90,13 +106,17 @@ The three-phase split is the key correctness fix: descriptors are generated *bef
 
 ## MCP Tool Interface
 
-Three tools in `qdrant_mcp_server.py` delegate to the package:
+The `qdrant_mcp_server.py` exposes 8 tools total. Three swarm tools delegate to the DyTopo package:
 
 - **`swarm_start(task, domain, tau, k_in, max_rounds)`** — launches background task via `asyncio.create_task()`, returns `task_id` immediately
 - **`swarm_status(task_id)`** — reports round progress, elapsed time, LLM calls
 - **`swarm_result(task_id, include_topology)`** — returns final answer, metrics, optional per-round topology log
 
-The server stores up to 20 concurrent tasks in `_swarm_tasks` dict and evicts oldest completed tasks when the limit is reached.
+Five RAG tools provide hybrid search: `rag_search`, `rag_status`, `rag_reindex`, `rag_sources`, `rag_file_info`.
+
+A separate **system-status MCP server** (`src/mcp_servers/system_status_mcp.py`) provides 6 diagnostic tools: `service_health`, `qdrant_collections`, `gpu_status`, `llm_slots`, `docker_status`, `stack_config`.
+
+The swarm server stores up to 20 concurrent tasks in `_swarm_tasks` dict and evicts oldest completed tasks when the limit is reached.
 
 ## Governance & Robustness
 
@@ -137,10 +157,21 @@ The server stores up to 20 concurrent tasks in `_swarm_tasks` dict and evicts ol
 - **Semantic retrieval**: `query_similar(text, limit)` finds past solutions relevant to a new task
 - **Graceful degradation**: Qdrant unavailability is caught and logged — memory write failure never crashes a swarm
 
+### Stigmergic Trace Routing
+- **`StigmergicRouter`** (`stigmergic_router.py`): Wraps the functional routing pipeline and adds trace-aware topology construction via Qdrant-persisted swarm traces
+- **Trace deposit**: After a successful swarm, the routing pattern (active edges, agent roles, convergence data, quality score) is embedded via MiniLM-L6-v2 (384-dim) and stored in Qdrant collection `swarm_traces`
+- **Trace retrieval**: On topology construction, similar past traces are retrieved and used to compute a time-decayed boost matrix. The boost blends with the cosine similarity matrix: `S = (1-α)*S + α*B` where `α = boost_weight` (default 0.15)
+- **Role-pair mapping**: Historical traces map role-pairs (not agent IDs), so traces from one swarm can boost routing in a differently-composed swarm with matching roles
+- **Time decay**: Trace influence decays exponentially: `weight = 2^(-age_hours / half_life_hours)` (default half-life: 168h / 1 week)
+- **Quality gating**: Only traces with `final_answer_quality >= min_quality` (default 0.5) are deposited
+- **Graceful degradation**: All Qdrant operations are wrapped in try/except — trace failure never affects routing correctness
+- **Pruning**: `prune_old_traces()` deletes traces older than `prune_max_age_hours` (default 720h / 30 days)
+
 ### Pre-run Health Check
 - **`preflight_check()`** (`health/checker.py`): Parallel HTTP probes to LLM (llama.cpp `/v1/models`), Qdrant (`/collections`), AnythingLLM (`/api/v1/auth`), and GPU (`nvidia-smi`)
 - **Integration**: Runs at the start of `run_swarm()`. If LLM is unreachable, the swarm aborts with `RuntimeError`. Other component failures are logged as warnings
 - **Models**: `HealthStatus` and `StackHealth` Pydantic models track per-component health with latency
+- **Health Monitor Sidecar** (`scripts/health_monitor.py`): Standalone Python process that reuses `HealthChecker` for continuous monitoring (every 30s), auto-restarts failed Docker containers, and logs structured JSONL. Separate from the swarm — runs independently alongside the Docker stack
 
 ## Error Isolation
 

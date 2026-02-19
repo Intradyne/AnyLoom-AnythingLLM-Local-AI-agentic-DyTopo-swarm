@@ -41,6 +41,7 @@ from dytopo.agents import (
     get_system_prompt,
 )
 from dytopo.router import build_routing_result, log_routing_round
+from dytopo.stigmergic_router import StigmergicRouter, build_trace_edges
 from dytopo.graph import build_execution_graph, get_execution_order, get_execution_tiers, get_incoming_agents
 from dytopo.governance import (
     check_aegean_termination,
@@ -479,9 +480,28 @@ async def run_swarm(
     except Exception as e:
         logger.warning(f"Pre-run health check failed (non-fatal): {e}")
 
+    # Initialize stigmergic router if traces are enabled
+    traces_cfg = config.get("traces", {})
+    stigmergic_router = None
+    all_trace_edges: list[dict] = []
+    if traces_cfg.get("enabled", False):
+        stigmergic_router = StigmergicRouter(
+            qdrant_url=traces_cfg.get("qdrant_url", "http://localhost:6333"),
+            enable_traces=True,
+            trace_boost_weight=traces_cfg.get("boost_weight", 0.15),
+            trace_half_life_hours=traces_cfg.get("half_life_hours", 168.0),
+            top_k=traces_cfg.get("top_k", 5),
+            min_quality=traces_cfg.get("min_quality", 0.5),
+            prune_max_age_hours=traces_cfg.get("prune_max_age_hours", 720.0),
+        )
+        logger.info("Stigmergic router enabled (boost=%.2f, half_life=%.0fh)",
+                     traces_cfg.get("boost_weight", 0.15),
+                     traces_cfg.get("half_life_hours", 168.0))
+
     agents = build_agent_roster(swarm.domain)
     agent_map = {a.agent_id: a for a in agents if a.role != AgentRole.MANAGER}
     manager_agent = next(a for a in agents if a.role == AgentRole.MANAGER)
+    agent_role_map = {a.agent_id: get_role_name(a.role) for a in agents}
 
     # Initialize audit log
     audit = SwarmAuditLog(swarm.task_id, base_dir=config["logging"]["log_dir"])
@@ -619,7 +639,22 @@ async def run_swarm(
             # Phase B: Build routing graph (CPU-only, ~10-50ms)
             await progress("phase_routing", {"round": t})
             agent_ids = list(agent_map.keys())
-            routing = build_routing_result(agent_ids, descriptors, swarm.tau, swarm.K_in)
+            if stigmergic_router is not None:
+                routing = await stigmergic_router.build_topology(
+                    agent_ids, descriptors,
+                    task_summary=swarm.task,
+                    threshold=swarm.tau,
+                    max_in_degree=swarm.K_in,
+                )
+                # Accumulate trace edges for post-run deposit
+                all_trace_edges.extend(
+                    build_trace_edges(routing["edges"], agent_role_map, t)
+                )
+                trace_ctx = routing.get("trace_context", {})
+                if trace_ctx.get("boost_applied"):
+                    logger.info(f"Round {t}: trace boost applied from {trace_ctx.get('traces_used', 0)} traces")
+            else:
+                routing = build_routing_result(agent_ids, descriptors, swarm.tau, swarm.K_in)
             round_record.edges = routing["edges"]
             round_record.isolated_agents = routing["isolated"]
             round_record.removed_edges = routing["removed_edges"]
@@ -883,5 +918,32 @@ async def run_swarm(
                 logger.info(f"Swarm result persisted to memory for task {swarm.task_id}")
             except Exception as e:
                 logger.warning(f"Post-run memory write failed (non-fatal): {e}")
+
+        # Post-run stigmergic trace deposit (non-fatal)
+        if swarm.status == SwarmStatus.COMPLETE and stigmergic_router is not None and all_trace_edges:
+            try:
+                agent_roles_list = [
+                    get_role_name(a.role) for a in agent_map.values()
+                ] if agent_map else []
+                # Use convergence similarity as quality proxy (0.0-1.0)
+                quality = 0.7  # default for max_rounds termination
+                if swarm.termination_reason in ("convergence", "aegean_consensus"):
+                    quality = 0.9
+                elif swarm.termination_reason == "manager_halt":
+                    quality = 0.8
+
+                trace_id = await stigmergic_router.deposit_trace(
+                    task_summary=swarm.task,
+                    active_edges=all_trace_edges,
+                    agent_roles=agent_roles_list,
+                    rounds_to_converge=len(swarm.rounds),
+                    final_answer_quality=quality,
+                    convergence_method=swarm.termination_reason,
+                    task_domain=swarm.domain.value,
+                )
+                if trace_id:
+                    logger.info(f"Stigmergic trace deposited: {trace_id}")
+            except Exception as e:
+                logger.warning(f"Stigmergic trace deposit failed (non-fatal): {e}")
 
     return swarm

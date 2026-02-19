@@ -5,70 +5,89 @@
 ```
 ┌──────────────────────────────────────────────────────────────────┐
 │                     Docker Network: anyloom                      │
-│                                                                   │
+│                                                                  │
 │  ┌────────────────────────────────────────────────────────────┐  │
-│  │  anyloom-llm                                              │  │
-│  │  Qwen3-30B-A3B-Instruct-2507 (Q4_K_M GGUF)          │  │
+│  │  anyloom-llm                                               │  │
+│  │  Qwen3-30B-A3B-Instruct-2507 (Q4_K_M GGUF)               │  │
 │  │                                                            │  │
-│  │  Model weights (Q4_K_M):      ~18.6 GiB VRAM          │  │
-│  │  KV cache (131K, Q8/Q4):     ~5.0 GiB VRAM            │  │
-│  │  llama.cpp overhead:          ~1.0 GiB VRAM            │  │
-│  │  ─────────────────────────────────────────────          │  │
-│  │  Total:                       ~24.6 GiB / 32 GiB       │  │
+│  │  Model weights (Q4_K_M):      ~18.6 GiB VRAM              │  │
+│  │  KV cache (131K, Q8/Q8):      ~7.0 GiB VRAM              │  │
+│  │  llama.cpp overhead:          ~1.0 GiB VRAM               │  │
+│  │  ─────────────────────────────────────────────             │  │
+│  │  Total:                       ~26.6 GiB / 32 GiB          │  │
 │  │                                                            │  │
 │  │  Container port: 8080                                      │  │
 │  │  Host port: 8008                                           │  │
-│  │  Internal: http://anyloom-llm:8080/v1                     │  │
-│  │  External: http://localhost:8008/v1                        │  │
+│  │  Internal: http://anyloom-llm:8080/v1                      │  │
+│  │  External: http://localhost:8008/v1                         │  │
+│  │  Parallel slots: 2                                         │  │
 │  └────────────────┬───────────────────────────────────────────┘  │
 │                   │                                              │
-│  ┌────────────────▼───────────────┐  ┌────────────────────────┐ │
-│  │  anyloom-anythingllm         │  │  anyloom-qdrant      │ │
-│  │  Port: 3001                    │  │  Port: 6333 (REST)     │ │
-│  │                                │  │  Port: 6334 (gRPC)     │ │
-│  │  LLM: anyloom-llm:8080       │  │                        │ │
-│  │  VectorDB: anyloom-qdrant:6333│ │  Hybrid dense+sparse   │ │
-│  │                                │  │  RRF fusion            │ │
-│  │  Workspace RAG:                │  │  source_dir filtering  │ │
-│  │   2500-char chunks             │◀─┤                        │ │
-│  │   (~625 tokens)                │  │                        │ │
-│  │   16 snippets, Low sim         │  │                        │ │
-│  │   30 msg history               │  │                        │ │
-│  └────────────────────────────────┘  └────────────────────────┘ │
+│  ┌────────────────▼───────────────┐  ┌────────────────────────┐  │
+│  │  anyloom-anythingllm           │  │  anyloom-qdrant        │  │
+│  │  Port: 3001                    │  │  Port: 6333 (REST)     │  │
+│  │                                │  │  Port: 6334 (gRPC)     │  │
+│  │  LLM: anyloom-llm:8080        │  │                        │  │
+│  │  VectorDB: anyloom-qdrant:6333 │  │  Hybrid dense+sparse   │  │
+│  │  Embed: anyloom-embedding:8080 │  │  RRF fusion            │  │
+│  │                                │  │  source_dir filtering  │  │
+│  │  Workspace RAG:                │◀─┤                        │  │
+│  │   2500-char chunks             │  │                        │  │
+│  │   (~625 tokens)                │  │                        │  │
+│  │   16 snippets, Low sim         │  │                        │  │
+│  │   30 msg history               │  │                        │  │
+│  │                                │  │                        │  │
+│  │  MCP servers (6, stdio):       │  │  Collections:          │  │
+│  │   fetch, memory, tavily,       │  │   anythingllm (RAG)    │  │
+│  │   context7, filesystem,        │  │   swarm_memory         │  │
+│  │   sequential-thinking          │  │   swarm_traces         │  │
+│  └────────────────────────────────┘  └────────────────────────┘  │
 │                                                                   │
-└───────────────────────────────────────────────────────────────────┘
+│  ┌────────────────────────────────┐                              │
+│  │  anyloom-embedding             │                              │
+│  │  BGE-M3 Q8_0 GGUF (GPU)       │                              │
+│  │  Port: 8009 (host) / 8080     │                              │
+│  │  1024-dim dense, 8192 ctx/slot │                              │
+│  │  ~635 MB VRAM, 2 parallel slots│                              │
+│  └────────────────────────────────┘                              │
+└──────────────────────────────────────────────────────────────────┘
                                 │
-                                │ localhost:8008, localhost:6333
+                                │ localhost:8008, :8009, :6333
                                 ▼
          ┌──────────────────────────────────────────────┐
          │  Host (Native Python)                        │
          │                                              │
-         │  MCP Server: qdrant_mcp_server.py            │
-         │   • Connects to llama.cpp: localhost:8008     │
-         │   • Connects to Qdrant: localhost:6333       │
+         │  MCP: qdrant_mcp_server.py (8 tools)         │
+         │   • rag_search, rag_status, rag_reindex,     │
+         │     rag_sources, rag_file_info               │
+         │   • swarm_start, swarm_status, swarm_result  │
+         │   • BGE-M3 ONNX INT8 on CPU (~0.6 GB RAM)   │
+         │   • Hybrid dense+sparse RRF search           │
          │                                              │
-         │  BGE-M3 Embedding (ONNX INT8, CPU):             │
-         │   • Dense + TF-sparse vectors                │
-         │   • RRF hybrid search                        │
-         │   • ~0.6 GB RAM, 0 VRAM                      │
+         │  MCP: system_status_mcp.py (6 tools)         │
+         │   • service_health, qdrant_collections,      │
+         │     gpu_status, llm_slots,                   │
+         │     docker_status, stack_config              │
          │                                              │
          │  DyTopo Package (src/dytopo/):               │
-         │   • MiniLM-L6-v2 on CPU (routing)            │
-         │   • ~80 MB RAM                               │
-         │   • 3 domains, 3-5 rounds                    │
-         │   • τ=0.5 threshold                          │
+         │   • MiniLM-L6-v2 on CPU (routing, ~80 MB)   │
+         │   • Stigmergic router (trace-aware topology) │
+         │   • 3 domains, 3-5 rounds, τ=0.5            │
          │   • AsyncOpenAI → localhost:8008             │
-         │   • temp 0.1 descriptors                     │
-         │   • temp 0.3 work output                     │
-         │   • Semaphore-based concurrency              │
+         │   • Semaphore-based concurrency (2 slots)    │
+         │   • Aegean consensus termination             │
          │                                              │
-         │  MCP Tools (qdrant-rag server):              │
-         │   • swarm_start, swarm_status, swarm_result  │
-         │   • Hybrid RAG search operations             │
+         │  Health Monitor (scripts/health_monitor.py)  │
+         │   • Probes all 4 containers every 30s        │
+         │   • Auto-restart via docker restart           │
+         │   • Crash window: 3 attempts / 15 min        │
+         │   • JSONL logs: ~/anyloom-logs/health.jsonl  │
          └──────────────────────────────────────────────┘
 ```
 
 ## VRAM Budget
+
+### LLM (anyloom-llm)
 
 | Component | Size |
 |---|---|
@@ -76,34 +95,59 @@
 | llama.cpp overhead | ~1.0 GiB |
 | **Subtotal (fixed)** | **~19.6 GiB** |
 
-| Context Length | KV Cache (Q8_0 K / Q4_0 V) | Total VRAM | Status |
+| Context Length | KV Cache (Q8_0 K / Q8_0 V) | Total VRAM | Status |
 |---|---|---|---|
-| 8K | ~0.3 GiB | ~19.9 GiB | Comfortable |
-| 32K | ~1.2 GiB | ~20.8 GiB | Comfortable |
-| 64K | ~2.5 GiB | ~22.1 GiB | Comfortable |
-| 131K (default) | ~5.0 GiB | ~24.6 GiB | Default — fits 32GB with headroom |
+| 8K | ~0.4 GiB | ~20.0 GiB | Comfortable |
+| 32K | ~1.7 GiB | ~21.3 GiB | Comfortable |
+| 64K | ~3.4 GiB | ~23.0 GiB | Comfortable |
+| 131K (default) | ~7.0 GiB | ~26.6 GiB | Default — fits 32GB with headroom |
 
-llama.cpp loads the Q4_K_M GGUF model file directly (~18.6 GiB on disk, same in VRAM). KV cache uses quantized types (--cache-type-k q8_0 --cache-type-v q4_0) at ~39 KiB/token. Flash attention (--flash-attn on) is enabled. Default context is 131K tokens.
+llama.cpp loads the Q4_K_M GGUF model file directly (~18.6 GiB on disk, same in VRAM). KV cache uses quantized types (`--cache-type-k q8_0 --cache-type-v q8_0`) at ~55 KiB/token. Flash attention (`--flash-attn on`) is enabled. Default context is 131K tokens. 2 parallel slots with speculative decoding (`-sps 0.5`).
 
-BGE-M3 on CPU (ONNX INT8, sentence-transformers, MCP server process): ~0.6 GB RAM, 0 VRAM.
-MiniLM-L6-v2 on CPU (sentence-transformers, MCP server process, DyTopo routing): ~80 MB RAM, 0 VRAM.
+### Embedding (anyloom-embedding)
+
+| Component | Size |
+|---|---|
+| BGE-M3 Q8_0 GGUF weights | ~635 MB |
+| KV cache (16K ctx, 2 slots) | ~50 MB |
+| **Total** | **~685 MB VRAM** |
+
+### CPU-only models (host)
+
+| Model | Used by | RAM |
+|---|---|---|
+| BGE-M3 ONNX INT8 | MCP qdrant-rag server (hybrid search) | ~0.6 GB |
+| MiniLM-L6-v2 | DyTopo routing + stigmergic router | ~80 MB |
 
 ## Port Map
 
 | Port | Service | Used By |
 |---|---|---|
-| 8008 | llama.cpp API (Docker host port) | MCP server inference, DyTopo swarm agent inference, direct API calls from host |
-| 8080 | llama.cpp API (Docker container port) | AnythingLLM inference (via Docker network anyloom-llm:8080) |
-| 6333 | Qdrant REST (Docker, single hybrid instance) | AnythingLLM workspace RAG, MCP qdrant-rag server |
+| 8008 | llama.cpp LLM API (Docker host port) | MCP server inference, DyTopo swarm agent inference, direct API calls from host |
+| 8009 | llama.cpp Embedding API (Docker host port) | AnythingLLM chunk embedding (via Docker network anyloom-embedding:8080), health monitor probes |
+| 8080 | llama.cpp container port (internal) | AnythingLLM inference (anyloom-llm:8080), embedding (anyloom-embedding:8080) |
+| 6333 | Qdrant REST (Docker, single hybrid instance) | AnythingLLM workspace RAG, MCP qdrant-rag server, stigmergic router traces, swarm memory |
 | 6334 | Qdrant gRPC (Docker) | Optional gRPC access |
 | 3001 | AnythingLLM UI (Docker) | User web interface for workspace chat |
 
 ## Component Summary
 
-llama.cpp is the sole GPU inference backend for all LLM operations in the stack. It runs in Docker container `anyloom-llm` on the `anyloom` network, with container port 8080 mapped to host port 8008. It provides high throughput and parallel execution using Q4_K_M GGUF quantization (~18.6 GiB weights + quantized KV cache + flash attention fits in 32GB VRAM at 131K context). llama.cpp handles all LLM inference for both AnythingLLM and DyTopo swarm agent calls. There is no fallback inference backend.
+### Docker containers
 
-AnythingLLM runs in Docker container `anyloom-anythingllm` on port 3001, providing a workspace-based RAG interface with its own document ingestion pipeline. It connects to llama.cpp via the Docker network at `http://anyloom-llm:8080/v1` for LLM inference, and stores vectors in the Qdrant instance at `http://anyloom-qdrant:6333`. AnythingLLM uses its own embedding provider (configured in the UI). Its chunking strategy uses 2500-character chunks (~625 tokens), controlled by EmbeddingModelMaxChunkLength (the only effective chunk setting via AnythingLLM's API), retrieving 16 snippets at low similarity threshold with 30-message conversation history.
+**llama.cpp LLM** (`anyloom-llm`) is the sole GPU inference backend for all LLM operations in the stack. It runs on the `anyloom` network with container port 8080 mapped to host port 8008. Q4_K_M GGUF quantization (~18.6 GiB weights + ~7 GiB KV cache q8_0/q8_0 + flash attention = ~26.6 GiB in 32GB VRAM at 131K context). 2 parallel slots with speculative decoding. Handles all LLM inference for AnythingLLM, DyTopo swarm, and direct API calls. No fallback inference backend.
 
-The MCP server (`qdrant_mcp_server.py`) runs natively on the host as a Python process. It connects to llama.cpp at `http://localhost:8008` and Qdrant at `http://localhost:6333`. The server implements hybrid dense+sparse RAG search with RRF fusion using BGE-M3 ONNX INT8 on CPU (~0.6 GB RAM, 0 VRAM), and DyTopo multi-agent swarm orchestration using MiniLM-L6-v2 on CPU for descriptor routing (~80 MB RAM). DyTopo is structured as a dedicated Python package (`src/dytopo/`) with 8 core modules and 6 sub-packages: core modules include `models.py` (Pydantic v2 data models), `config.py` (YAML configuration), `agents.py` (system prompts, JSON schemas, domain rosters), `router.py` (MiniLM embedding and similarity routing), `graph.py` (NetworkX DAG construction with topological tier computation), `orchestrator.py` (async parallel swarm loop with AsyncOpenAI client and semaphore-based concurrency), `governance.py` (convergence/stalling detection), and `audit.py` (JSONL audit logging); sub-packages provide `observability/` (distributed tracing, metrics, profiling), `safeguards/` (rate limiter, token budget, circuit breaker), `messaging/` (typed agent message passing), `routing/` (async routing engine), `delegation/` (subtask delegation with depth control), and `documentation/` (auto-generated living docs from code and execution data). The MCP server exposes 3 thin MCP tools (`swarm_start`, `swarm_status`, `swarm_result`) that delegate to this package, plus hybrid RAG search operations.
+**llama.cpp Embedding** (`anyloom-embedding`) runs BGE-M3 Q8_0 GGUF on GPU (~635 MB VRAM) with container port 8080 mapped to host port 8009. Provides OpenAI-compatible `/v1/embeddings` endpoint with 1024-dim dense vectors, 8192 token context per slot, 2 parallel slots. Used by AnythingLLM for document chunk embedding.
 
-Qdrant runs in Docker container `anyloom-qdrant` on ports 6333 (REST) and 6334 (gRPC). It serves both RAG pipelines as a single hybrid instance. It stores hybrid dense+sparse vectors with RRF fusion, payload-indexed by source file and source directory for filtered retrieval across multiple document sources. AnythingLLM accesses it via the Docker network, while the MCP server connects from the host at `localhost:6333`.
+**AnythingLLM** (`anyloom-anythingllm`) runs on port 3001, providing a workspace-based RAG interface with document ingestion. Connects to llama.cpp LLM at `http://anyloom-llm:8080/v1`, embedding at `http://anyloom-embedding:8080/v1`, and Qdrant at `http://anyloom-qdrant:6333`. Chunking: 2500-char chunks (~625 tokens) via EmbeddingModelMaxChunkLength, 16 snippets at low similarity, 30-message history. Runs 6 MCP servers as stdio child processes: fetch, memory, tavily, context7, filesystem, sequential-thinking.
+
+**Qdrant** (`anyloom-qdrant`) runs on ports 6333 (REST) and 6334 (gRPC). Single hybrid instance serving multiple collections: AnythingLLM workspace RAG, `swarm_memory` (DyTopo run persistence, 384-dim), and `swarm_traces` (stigmergic routing traces, 384-dim). Supports hybrid dense+sparse vectors with RRF fusion, payload-indexed by source file and source directory for filtered retrieval.
+
+### Host-side processes
+
+**MCP server — qdrant-rag** (`src/qdrant_mcp_server.py`) runs natively as a Python process. Connects to llama.cpp at `localhost:8008` and Qdrant at `localhost:6333`. Exposes 8 tools: 5 RAG tools (`rag_search`, `rag_status`, `rag_reindex`, `rag_sources`, `rag_file_info`) with hybrid dense+sparse search using BGE-M3 ONNX INT8 on CPU (~0.6 GB RAM, 0 VRAM), and 3 DyTopo tools (`swarm_start`, `swarm_status`, `swarm_result`).
+
+**MCP server — system-status** (`src/mcp_servers/system_status_mcp.py`) runs natively as a Python process. Exposes 6 diagnostic tools: `service_health`, `qdrant_collections`, `gpu_status`, `llm_slots`, `docker_status`, `stack_config`. Reuses the `HealthChecker` class from DyTopo for service probes.
+
+**DyTopo swarm** (`src/dytopo/`) is a dedicated Python package with 8 core modules and 6 sub-packages. Core: `models.py` (Pydantic v2), `config.py` (YAML), `agents.py` (prompts, schemas, domain rosters), `router.py` (MiniLM-L6-v2 cosine similarity routing), `stigmergic_router.py` (trace-aware topology with Qdrant-persisted swarm traces and time-decayed boost matrix), `graph.py` (NetworkX DAG, topological tiers), `orchestrator.py` (async parallel swarm with semaphore concurrency, Aegean consensus termination), `governance.py` (convergence/stalling detection), `audit.py` (JSONL logging). Sub-packages: `observability/`, `safeguards/`, `messaging/`, `routing/`, `delegation/`, `documentation/`.
+
+**Health Monitor** (`scripts/health_monitor.py`) is a standalone Python sidecar (no LLM inference). Probes all 4 Docker containers + GPU every 30 seconds, auto-restarts failed containers via `docker restart`, with crash window protection (3 attempts per 15 minutes) and alert cooldown (30 minutes). Logs structured JSONL to `~/anyloom-logs/health.jsonl`. Configurable via `dytopo_config.yaml` or environment variables.

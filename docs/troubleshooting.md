@@ -136,6 +136,58 @@ print(f"Memory: {process.memory_info().rss / 1024**2:.0f} MB")
 
 ---
 
+### Issue: Health Check / Preflight Failures
+
+**Symptoms:**
+- Swarm aborts with `RuntimeError` (LLM unreachable)
+- Warnings about Qdrant, AnythingLLM, or GPU being unhealthy
+
+**Diagnosis:**
+```bash
+# Check Docker container status
+docker compose ps
+
+# Use the system-status MCP server (if running)
+# Or check endpoints directly:
+curl http://localhost:8008/v1/models      # LLM
+curl http://localhost:8009/health          # Embedding
+curl http://localhost:6333/health          # Qdrant
+curl http://localhost:3001/api/v1/system   # AnythingLLM
+```
+
+**Solutions:**
+- **LLM unreachable**: Check `docker logs anyloom-llm` — model may still be loading (~1-2 min on startup)
+- **Qdrant down**: `docker compose restart qdrant`
+- **Embedding down**: `docker compose restart embedding`
+- **GPU not detected**: Verify NVIDIA driver (`nvidia-smi`) and Docker GPU access
+
+**Health Monitor:** Run `python scripts/health_monitor.py` for continuous monitoring with auto-restart. Logs to `~/anyloom-logs/health.jsonl`.
+
+---
+
+### Issue: Stigmergic Traces Not Being Used
+
+**Symptoms:**
+- `trace_context` is empty in routing results
+- No improvement in routing over time
+
+**Diagnosis:**
+```python
+from dytopo.stigmergic_router import StigmergicRouter
+router = StigmergicRouter()
+stats = await router.get_trace_stats()
+print(stats)  # Check point count
+```
+
+**Solutions:**
+- Verify `traces.enabled: true` in `dytopo_config.yaml`
+- Check Qdrant is reachable at the configured `traces.qdrant_url`
+- Ensure swarms are completing with quality >= `min_quality` (default 0.5) — low-quality runs don't deposit traces
+- Check that `swarm_traces` collection exists in Qdrant dashboard (http://localhost:6333/dashboard)
+- Trace boost is subtle (`boost_weight: 0.15`) — run several swarms on similar tasks to build up traces
+
+---
+
 ## Performance Optimization Checklist
 
 - [ ] Run performance profiler to identify bottlenecks
@@ -181,6 +233,24 @@ print(BottleneckAnalyzer.format_report(report))
 
 ---
 
+### View Health Monitor Logs
+```bash
+# Tail the health monitor JSONL log
+tail -f ~/anyloom-logs/health.jsonl | python -m json.tool
+
+# Filter for failures only
+grep '"healthy": false' ~/anyloom-logs/health.jsonl
+```
+
+### Check Stack Status (via MCP)
+```python
+# If system-status MCP server is running:
+# Tools: service_health, qdrant_collections, gpu_status,
+#        llm_slots, docker_status, stack_config
+```
+
+---
+
 ## Getting Help
 
 If you encounter an issue not covered here:
@@ -188,4 +258,5 @@ If you encounter an issue not covered here:
 1. Export your trace: `await TraceCollector.export_trace(trace_id, Path("debug.json"))`
 2. Export failures: `await failure_analyzer.export_failures_json(Path("failures.json"))`
 3. Check audit log: `~/dytopo-logs/{task_id}/audit.jsonl`
-4. Open an issue with the exported data
+4. Check health log: `~/anyloom-logs/health.jsonl`
+5. Open an issue with the exported data
