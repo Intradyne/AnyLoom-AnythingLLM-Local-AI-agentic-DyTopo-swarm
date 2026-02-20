@@ -74,7 +74,7 @@ AnyLoom runs as a **Docker Compose stack** with these services:
 
 The entire RAG-prompt set fits comfortably inside the token limit. Context length is configurable (default 131K). Q4_K_M model weights are ~18.6 GiB, leaving ample room for KV cache on 32GB GPUs. See `docs/llm-engine.md` for VRAM budget details.
 
-> ✅ Runs on a single GPU (requires 32GB+ VRAM; optimized for RTX 5090)
+> ✅ Laptop Profile — RTX 2070 Max-Q (8GB VRAM), Qwen2.5-Coder-7B, 8K context, CPU embedding
 
 ---
 
@@ -82,13 +82,16 @@ The entire RAG-prompt set fits comfortably inside the token limit. Context lengt
 
 All you need:
 
-| Component | Requirement |
-|-----------|-------------|
-| **Docker Desktop** | v24.0+ with WSL2 integration and GPU support enabled |
-| **NVIDIA GPU** | RTX 4090/5090 or similar (32GB VRAM recommended for full 131K context. 24GB GPUs can run with reduced context.) |
-| **NVIDIA Driver** | 535+ (for CUDA 12 support) |
-| **Python** | 3.10+ (for benchmarks and DyTopo scripts) |
-| **Disk Space** | ~100GB for models and data |
+| Component | Desktop (main branch) | Laptop (this branch) |
+|-----------|----------------------|---------------------|
+| **GPU** | RTX 4090/5090 (32GB VRAM) | RTX 2070/2080 (8GB VRAM) |
+| **LLM** | Qwen3-30B-A3B Q4_K_M | Qwen2.5-Coder-7B Q4_K_M |
+| **Context** | 131K tokens | 8K tokens |
+| **Embedding** | BGE-M3 on GPU | BGE-M3 on CPU |
+| **RAM** | 64GB+ | 32GB |
+| **CPU** | 12+ core | 6+ core |
+| **Docker** | v24.0+ with WSL2/GPU | v24.0+ with WSL2/GPU |
+| **NVIDIA Driver** | 535+ | 535+ |
 
 > **Docker handles everything:** Qdrant, llama.cpp (LLM + Embedding), and AnythingLLM run as containers. No manual WSL setup or service management!
 
@@ -106,9 +109,9 @@ cd AnyLoom
 mkdir -p models
 pip install huggingface_hub
 
-# LLM model — Qwen3-30B-A3B Q4_K_M (~18.6 GB, GPU)
-huggingface-cli download Qwen/Qwen3-30B-A3B-Instruct-2507-GGUF \
-  Qwen3-30B-A3B-Instruct-2507-Q4_K_M.gguf \
+# LLM model — Qwen2.5-Coder-7B-Instruct Q4_K_M (~4.5 GB, GPU)
+huggingface-cli download Qwen/Qwen2.5-Coder-7B-Instruct-GGUF \
+  qwen2.5-coder-7b-instruct-q4_k_m.gguf \
   --local-dir models
 
 # Embedding model — BGE-M3 Q8_0 (~605 MB, GPU)
@@ -118,7 +121,7 @@ huggingface-cli download ggml-org/bge-m3-Q8_0-GGUF \
 ```
 
 > **Already have the LLM GGUF?** Symlink instead of re-downloading:
-> `ln -s ~/.lmstudio/models/lmstudio-community/Qwen3-30B-A3B-Instruct-2507-GGUF/Qwen3-30B-A3B-Instruct-2507-Q4_K_M.gguf models/`
+> `ln -s /path/to/qwen2.5-coder-7b-instruct-q4_k_m.gguf models/`
 
 ### 2. Start the Docker Stack
 

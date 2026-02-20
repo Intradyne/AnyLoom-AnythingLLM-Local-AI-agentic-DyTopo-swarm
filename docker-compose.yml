@@ -13,6 +13,10 @@ services:
       - qdrant_storage:/qdrant/storage
     environment:
       - QDRANT__SERVICE__GRPC_PORT=6334
+    deploy:
+      resources:
+        limits:
+          memory: 2g
     networks:
       - anyloom
     healthcheck:
@@ -24,11 +28,11 @@ services:
 
   # ============================================================================
   # LLM Inference Engine — llama.cpp server (GPU Required)
-  # Build local Blackwell image: bash scripts/build_llm_image.sh
-  # Falls back to official image (PTX JIT, ~10x slower on RTX 5090).
+  # Laptop profile: Qwen2.5-Coder-7B Q4_K_M (~4.5 GB VRAM)
+  # Single slot, 16K context, Q8_0 KV cache
   # ============================================================================
   llm:
-    image: ${LLM_IMAGE:-local/llama.cpp:server-cuda-blackwell}
+    image: ${LLM_IMAGE:-ghcr.io/ggml-org/llama.cpp:server-cuda}
     container_name: anyloom-llm
     restart: "no"  # Use "on-failure" when stable
     ports:
@@ -36,24 +40,22 @@ services:
     volumes:
       - ${LLM_MODEL_DIR:-./models}:/models:ro
     environment:
-      - GGML_CUDA_GRAPH_OPT=1
+      - GGML_CUDA_GRAPH_OPT=0  # Turing (sm_75) has limited CUDA graph support
     command: >
-      --model /models/Qwen3-30B-A3B-Instruct-2507-Q4_K_M.gguf
+      --model /models/qwen2.5-coder-7b-instruct-q4_k_m.gguf
       --alias gpt-4
-      --ctx-size ${LLM_CONTEXT_SIZE:-131072}
+      --ctx-size ${LLM_CONTEXT_SIZE:-8192}
       --n-gpu-layers 99
       --flash-attn on
-      --fit on
       --cache-type-k q8_0
       --cache-type-v q8_0
-      --batch-size 8192
-      --ubatch-size 4096
-      --threads 8
-      --threads-batch 16
+      --batch-size 2048
+      --ubatch-size 512
+      --threads 4
+      --threads-batch 6
       --jinja
       --slots
-      -np 2
-      -sps 0.5
+      -np 1
       --host 0.0.0.0
       --port 8080
     ipc: host
@@ -64,6 +66,8 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
+        limits:
+          memory: 8g
     networks:
       - anyloom
     healthcheck:
@@ -71,17 +75,15 @@ services:
       interval: 10s
       timeout: 10s
       retries: 5
-      start_period: 120s  # Model loading through WSL2/Docker
+      start_period: 60s
 
   # ============================================================================
-  # Embedding Engine — llama.cpp server (GPU, BGE-M3 for AnythingLLM dense-only)
-  # BGE-M3 Q8_0 is ~635 MB VRAM — fits alongside the LLM on 32 GB GPUs.
-  # IMPORTANT: llama.cpp divides ctx-size across parallel slots.
-  #   ctx-size 16384 / parallel 2 = 8192 tokens per slot (BGE-M3 max).
-  #   If you change --parallel, adjust --ctx-size = 8192 * N.
+  # Embedding Engine — llama.cpp server (CPU-only, BGE-M3 for AnythingLLM)
+  # Laptop profile: moved to CPU to free GPU VRAM for LLM.
+  # BGE-M3 Q8_0 produces 1024-dim dense vectors, same as desktop profile.
   # ============================================================================
   embedding:
-    image: ${LLM_IMAGE:-local/llama.cpp:server-cuda-blackwell}
+    image: ghcr.io/ggml-org/llama.cpp:server  # CPU-only image
     container_name: anyloom-embedding
     restart: unless-stopped
     ports:
@@ -91,22 +93,18 @@ services:
     command: >
       --model /models/bge-m3-q8_0.gguf
       --embeddings
-      --ctx-size 16384
-      --batch-size 8192
-      --ubatch-size 8192
-      --n-gpu-layers 99
-      --flash-attn on
-      --parallel 2
+      --ctx-size 8192
+      --batch-size 4096
+      --ubatch-size 4096
+      --n-gpu-layers 0
+      --parallel 1
       --threads 4
       --host 0.0.0.0
       --port 8080
     deploy:
       resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+        limits:
+          memory: 4g
     networks:
       - anyloom
     healthcheck:
@@ -123,7 +121,7 @@ services:
     image: mintplexlabs/anythingllm:latest
     container_name: anyloom-anythingllm
     restart: unless-stopped
-    shm_size: "1g"  # Chrome uses /dev/shm for IPC; Docker default 64MB causes BUS_ADRERR crashes
+    shm_size: "512m"  # Chrome uses /dev/shm for IPC; reduced from 1g for laptop
     init: true      # Reaps zombie Chrome processes (Node.js as PID 1 won't)
     ports:
       - "${ANYTHINGLLM_PORT:-3001}:3001"

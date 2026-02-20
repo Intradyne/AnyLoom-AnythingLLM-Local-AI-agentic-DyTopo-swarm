@@ -1,25 +1,25 @@
-# DyTopo Configuration
+# DyTopo Configuration — Laptop Profile (RTX 2070 Max-Q, 8GB VRAM)
 # Override defaults from dytopo/config.py here.
 
 llm:
   base_url: "http://localhost:8008/v1"
-  model: "qwen3-30b-a3b-instruct-2507"
-  max_context_tokens: 32768
+  model: "qwen2.5-coder-7b-instruct"
+  max_context_tokens: 8192
 
 routing:
-  tau: 0.5
-  K_in: 3
+  tau: 0.45
+  K_in: 2
 
 orchestration:
-  T_max: 5
-  convergence_threshold: 0.80
+  T_max: 3
+  convergence_threshold: 0.75
 
 logging:
   log_dir: "~/dytopo-logs"
 
 concurrency:
   backend: "llama-cpp"
-  max_concurrent: 2
+  max_concurrent: 1
   llm_base_url: "http://localhost:8008/v1"
 
 # Stigmergic trace settings
@@ -29,13 +29,13 @@ traces:
   collection: "swarm_traces"
   boost_weight: 0.15
   half_life_hours: 168.0
-  top_k: 5
+  top_k: 3
   min_quality: 0.5
   prune_max_age_hours: 720.0
 
 # Health monitor settings
 health_monitor:
-  check_interval_seconds: 30
+  check_interval_seconds: 60
   max_restart_attempts: 3
   crash_window_minutes: 15
   alert_cooldown_minutes: 30

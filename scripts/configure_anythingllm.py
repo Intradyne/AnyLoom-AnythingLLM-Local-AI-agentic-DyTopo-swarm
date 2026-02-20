@@ -44,10 +44,10 @@ DOCKER_QDRANT_URL = "http://anyloom-qdrant:6333"
 
 WORKSPACE_NAME = "AnyLoom"
 SYSTEM_PROMPT_PATH = os.path.join(
-    os.path.dirname(__file__), "..", "prompts", "anythingllm-system-prompt.md"
+    os.path.dirname(__file__), "..", "prompts", "anythingllm-system-prompt-laptop.md"
 )
 RAG_DOCS_DIR = os.path.normpath(
-    os.path.join(os.path.dirname(__file__), "..", "rag-docs", "anythingllm")
+    os.path.join(os.path.dirname(__file__), "..", "rag-docs", "anythingllm-laptop")
 )
 ENV_PATH = os.path.normpath(
     os.path.join(os.path.dirname(__file__), "..", ".env")
@@ -283,8 +283,8 @@ def configure_system_defaults(api_key):
         "GenericOpenAiBasePath": DOCKER_LLM_BASE,
         "GenericOpenAiModelPref": "gpt-4",  # Matches llama.cpp --alias; avoids tiktoken errors
         "GenericOpenAiKey": "not-needed",       # llama.cpp ignores auth but field must be non-empty
-        "GenericOpenAiTokenLimit": "131072",    # context window — must be string
-        "GenericOpenAiMaxTokens": "4096",       # max generation tokens per response
+        "GenericOpenAiTokenLimit": "16384",      # context window — must be string (16K for @agent headroom)
+        "GenericOpenAiMaxTokens": "1024",       # max generation tokens per response
         # Vector DB — Qdrant inside Docker
         "VectorDB": "qdrant",
         "QdrantEndpoint": DOCKER_QDRANT_URL,
@@ -398,9 +398,9 @@ def update_workspace(api_key, slug):
     prompt_text = load_system_prompt()
 
     settings = {
-        "openAiTemp": 0.3,
-        "openAiHistory": 30,
-        "topN": 8,
+        "openAiTemp": 0.5,
+        "openAiHistory": 1,
+        "topN": 4,
         "similarityThreshold": 0.25,
         "chatMode": "chat",
         "queryRefusalResponse": (
@@ -689,7 +689,13 @@ def upload_and_embed_rag_docs(api_key, slug, ctx_per_slot=0):
 # Smoke test
 # ---------------------------------------------------------------------------
 def smoke_test(api_key, slug):
-    """Send a quick query to verify end-to-end connectivity."""
+    """Send a query and validate response quality (not just non-empty).
+
+    Quality checks:
+    1. Length bounds: 50-1500 chars (not too short, not runaway)
+    2. Repetition detection: any 3-gram appearing >3 times => FAIL
+    3. Keyword check: must contain at least one relevant keyword
+    """
     print("\n  Sending smoke-test query: 'What is AnyLoom?'")
     try:
         r = requests.post(
@@ -700,15 +706,58 @@ def smoke_test(api_key, slug):
         )
         r.raise_for_status()
         text = r.json().get("textResponse", "")
-        if text:
-            preview = text[:150].replace("\n", " ")
-            print(f"  [OK] Response ({len(text)} chars): {preview}...")
-            return True
-        print("  [FAIL] Empty response")
-        return False
     except Exception as e:
         print(f"  [FAIL] Query failed: {e}")
         return False
+
+    if not text:
+        print("  [FAIL] Empty response")
+        return False
+
+    preview = text[:200].replace("\n", " ")
+    print(f"  Response ({len(text)} chars): {preview}...")
+
+    # --- Quality gate ---
+    passed = True
+
+    # 1. Length bounds
+    if len(text) < 50:
+        print(f"  [FAIL] Response too short ({len(text)} chars, min 50)")
+        passed = False
+    elif len(text) > 1500:
+        print(f"  [WARN] Response very long ({len(text)} chars) — may indicate runaway generation")
+
+    # 2. Repetition detection (3-gram frequency)
+    words = text.lower().split()
+    if len(words) >= 6:
+        trigrams = [" ".join(words[i:i+3]) for i in range(len(words) - 2)]
+        from collections import Counter
+        trigram_counts = Counter(trigrams)
+        worst_trigram, worst_count = trigram_counts.most_common(1)[0]
+        if worst_count > 3:
+            print(f"  [FAIL] Degenerate repetition detected: "
+                  f"'{worst_trigram}' appears {worst_count} times")
+            passed = False
+        else:
+            print(f"  [OK] No degenerate repetition (worst 3-gram: {worst_count}x)")
+
+    # 3. Keyword check — response should mention something relevant
+    keywords = ["anyloom", "swarm", "agent", "workspace", "qdrant",
+                "llama", "docker", "loom", "dytopo", "rag", "vector",
+                "inference", "model", "embedding"]
+    text_lower = text.lower()
+    found = [kw for kw in keywords if kw in text_lower]
+    if found:
+        print(f"  [OK] Relevant keywords found: {', '.join(found[:5])}")
+    else:
+        print(f"  [FAIL] No relevant keywords found in response")
+        passed = False
+
+    if passed:
+        print(f"  [OK] Smoke test PASSED")
+    else:
+        print(f"  [FAIL] Smoke test FAILED — see details above")
+    return passed
 
 
 # ---------------------------------------------------------------------------

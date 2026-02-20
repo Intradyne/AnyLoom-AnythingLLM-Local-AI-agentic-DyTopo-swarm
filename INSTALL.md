@@ -17,6 +17,24 @@ Complete Docker-based installation for AnyLoom - the fully local AI agentic stac
 | **Storage** | 100GB free | 200GB+ SSD |
 | **CPU** | 8-core | 12+ core |
 
+### Laptop Profile (8GB VRAM)
+
+This branch (`feature/laptop-constraint-2070`) is optimized for laptops:
+
+- **GPU:** RTX 2070/2080 (8GB VRAM)
+- **LLM:** Qwen2.5-Coder-7B-Instruct Q4_K_M (~4.5 GB)
+- **Context:** 8K tokens (vs 131K on desktop)
+- **Embedding:** BGE-M3 on CPU (no GPU VRAM used)
+- **Concurrency:** Single slot, sequential execution
+- **DyTopo rounds:** 3 max (vs 5 on desktop)
+
+Download the laptop model:
+```bash
+huggingface-cli download Qwen/Qwen2.5-Coder-7B-Instruct-GGUF \
+  qwen2.5-coder-7b-instruct-q4_k_m.gguf \
+  --local-dir models
+```
+
 ### Software
 
 | Component | Version | Purpose |
