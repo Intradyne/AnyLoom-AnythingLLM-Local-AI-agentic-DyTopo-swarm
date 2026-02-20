@@ -11,10 +11,13 @@ Core modules:
 - models: Pydantic v2 data structures (SwarmTask, AgentState, etc.)
 - config: YAML configuration loader with defaults + concurrency backend
 - agents: System prompts, domain configs, roster builder
-- router: Embedding, similarity matrix, threshold, degree cap
+- router: Embedding, similarity matrix, threshold, degree cap, intent enrichment
 - graph: DAG construction, cycle breaking, topological tiers
 - orchestrator: Async parallel swarm loop with backend-agnostic LLM client
-- governance: Convergence detection, stalling, re-delegation
+- governance: Convergence detection, stalling, re-delegation, stalemate detection
+- checkpoint: Crash recovery via atomic checkpoint persistence (Pydantic v2 round-trip)
+- policy: Deny-first tool-call policy enforcement (PCAS-Lite)
+- verifier: Deterministic output verification (syntax, schema, no LLM)
 - audit: JSONL event logging
 
 Sub-packages:
@@ -54,7 +57,12 @@ from dytopo.governance import (
     detect_stalling,
     recommend_redelegation,
     update_agent_metrics,
+    StalemateDetector,
+    StalemateResult,
+    get_generalist_fallback_agent,
 )
+from dytopo.checkpoint import CheckpointManager
+from dytopo.policy import PolicyEnforcer, PolicyDecision
 from dytopo.audit import SwarmAuditLog
 from dytopo.safeguards import (
     CircuitBreaker,
@@ -98,6 +106,14 @@ __all__ = [
     "detect_stalling",
     "recommend_redelegation",
     "update_agent_metrics",
+    "StalemateDetector",
+    "StalemateResult",
+    "get_generalist_fallback_agent",
+    # Checkpoint
+    "CheckpointManager",
+    # Policy
+    "PolicyEnforcer",
+    "PolicyDecision",
     # Audit
     "SwarmAuditLog",
     # Safeguards

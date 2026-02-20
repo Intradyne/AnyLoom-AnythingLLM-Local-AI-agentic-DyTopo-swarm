@@ -4,18 +4,21 @@
 
 ## Architecture
 
-The governance module is one of 9 core modules in the `src/dytopo/` package (which also includes sub-packages for observability, safeguards, messaging, routing, delegation, and documentation):
+The governance module is one of 12 core modules in the `src/dytopo/` package (which also includes sub-packages for observability, safeguards, messaging, routing, delegation, and documentation):
 
 | Module | Role |
 |--------|------|
 | `models.py` | Pydantic v2 data models (`AgentMetrics`, `SwarmMetrics`, `SwarmTask`, etc.) |
-| `config.py` | YAML configuration with `convergence_threshold` setting |
+| `config.py` | YAML configuration with `convergence_threshold`, `checkpoint`, and `verification` settings |
 | `agents.py` | System prompts, JSON schemas, domain agent rosters |
-| `router.py` | MiniLM-L6-v2 embedding, cosine similarity, threshold routing |
+| `router.py` | MiniLM-L6-v2 embedding, cosine similarity, threshold routing, intent embedding enrichment |
 | `stigmergic_router.py` | Trace-aware topology: Qdrant-persisted swarm traces, time-decayed boost matrix |
 | `graph.py` | NetworkX DAG, cycle breaking, topological sort |
-| `orchestrator.py` | Main loop — calls governance functions after each round |
-| **`governance.py`** | **Convergence, stalling, re-delegation, Aegean consensus (this module)** |
+| `orchestrator.py` | Main loop — calls governance functions after each round; integrates checkpoint, policy, verifier, stalemate via guarded imports |
+| **`governance.py`** | **Convergence, stalling, re-delegation, Aegean consensus, stalemate detection, generalist fallback (this module)** |
+| `checkpoint.py` | CheckpointManager — atomic crash-recovery persistence of SwarmTask state |
+| `policy.py` | PolicyEnforcer (PCAS-Lite) — deny-first tool-call policy enforcement |
+| `verifier.py` | OutputVerifier — deterministic output verification (syntax, schema, no LLM) |
 | `audit.py` | JSONL audit logging for all events |
 
 ## How Governance Integrates with the Orchestrator
@@ -25,9 +28,14 @@ The orchestrator (`run_swarm()`) calls governance functions at specific points:
 1. **After each round (t >= 3)**: `detect_convergence()` checks if agent outputs have stabilized
 2. **After each round (t >= 2)**: `check_aegean_termination()` runs embedding-based consensus vote
 3. **After each round (t >= 2)**: `recommend_redelegation()` identifies stalling or failing agents
-4. **On convergence**: Sets `swarm.termination_reason = "convergence"` and breaks early
-5. **On Aegean consensus**: Sets `swarm.termination_reason = "aegean_consensus"` and breaks early
-6. **On re-delegation**: Logs recommendations via `audit.redelegation()` and increments `swarm_metrics.redelegations`
+4. **After governance checks**: `StalemateDetector.check()` analyzes routing patterns for ping-pong, no-progress, and regression stalemates (when `_HAS_STALEMATE` is True)
+5. **On convergence**: Sets `swarm.termination_reason = "convergence"` and breaks early
+6. **On Aegean consensus**: Sets `swarm.termination_reason = "aegean_consensus"` and breaks early
+7. **On stalemate**: Injects generalist fallback agent via `get_generalist_fallback_agent()`, or triggers forced termination
+8. **On re-delegation**: Logs recommendations via `audit.redelegation()` and increments `swarm_metrics.redelegations`
+9. **After each step**: Saves checkpoint via `CheckpointManager.save()` (when `_HAS_CHECKPOINT` is True)
+10. **Before tool execution**: Checks `PolicyEnforcer.enforce()` for deny-first policy gating (when `_HAS_POLICY` is True)
+11. **After agent execution**: Runs `OutputVerifier.verify()` for deterministic output verification (when `_HAS_VERIFIER` is True)
 
 ## Functions
 
@@ -65,6 +73,19 @@ The orchestrator (`run_swarm()`) calls governance functions at specific points:
 ### `update_agent_metrics(agent_state, round_result)`
 - Updates dict-based agent state with round results
 - Tracks total_rounds, failures, retries, failure_rate
+
+### `StalemateDetector` (class)
+- Detects systemic stalemates in the swarm routing topology across rounds
+- Three detection patterns: **ping-pong** (two agents routing to each other without involving others), **no progress** (convergence score unchanged for multiple rounds), **regression** (convergence score actively decreasing)
+- `check(round_history, convergence_scores)` returns a `StalemateResult`
+
+### `StalemateResult` (dataclass)
+- `is_stalled: bool`, `reason: str`, `suggested_action: str` (one of `"generalist"`, `"force_terminate"`, `"human_in_loop"`, `""`), `stale_pair: tuple[str, str] | None`
+
+### `get_generalist_fallback_agent(agent_states, stale_pair)`
+- Selects a fallback agent to break a stalemate
+- Picks the agent NOT in the stale pair that has been used least (fewest rounds participated)
+- Returns the agent_id string, or None if no suitable fallback exists
 
 ## Metrics Tracked
 

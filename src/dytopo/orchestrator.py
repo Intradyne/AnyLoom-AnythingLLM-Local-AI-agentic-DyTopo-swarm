@@ -54,6 +54,31 @@ from dytopo.health.checker import preflight_check
 from dytopo.memory.writer import SwarmMemoryWriter
 from inference.llm_client import get_client, reset_client
 
+# Guarded imports for hardening modules (optional, fail-safe)
+try:
+    from dytopo.checkpoint import CheckpointManager
+    _HAS_CHECKPOINT = True
+except ImportError:
+    _HAS_CHECKPOINT = False
+
+try:
+    from dytopo.governance import StalemateDetector, get_generalist_fallback_agent
+    _HAS_STALEMATE = True
+except ImportError:
+    _HAS_STALEMATE = False
+
+try:
+    from dytopo.verifier import OutputVerifier
+    _HAS_VERIFIER = True
+except ImportError:
+    _HAS_VERIFIER = False
+
+try:
+    from dytopo.policy import PolicyEnforcer
+    _HAS_POLICY = True
+except ImportError:
+    _HAS_POLICY = False
+
 logger = logging.getLogger("dytopo.orchestrator")
 
 
@@ -445,6 +470,31 @@ def _summarize_rounds(rounds: list[RoundRecord], agent_map: dict[str, AgentState
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  Checkpoint Recovery
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+def check_recoverable_tasks(config: dict | None = None) -> list[dict]:
+    """Scan checkpoint directory for incomplete tasks that can be resumed.
+
+    Returns:
+        List of dicts with task_id, last_modified, checkpoint_count.
+        Empty list if checkpoints are disabled or unavailable.
+    """
+    if not _HAS_CHECKPOINT:
+        return []
+    cfg = config or load_config()
+    cp_cfg = cfg.get("checkpoint", {})
+    if not cp_cfg.get("enabled", True):
+        return []
+    try:
+        mgr = CheckpointManager("_scan", cp_cfg.get("checkpoint_dir", "~/dytopo-checkpoints"))
+        return mgr.list_hot_tasks()
+    except Exception as e:
+        logger.warning(f"Checkpoint scan failed: {e}")
+        return []
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  Main Orchestration Loop
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -508,6 +558,33 @@ async def run_swarm(
     agent_names = [a.agent_id for a in agents]
     audit.swarm_started(swarm.task, swarm.T_max, agent_names)
 
+    # Initialize hardening modules (all guarded, non-fatal)
+    checkpoint_mgr = None
+    cp_cfg = config.get("checkpoint", {})
+    if _HAS_CHECKPOINT and cp_cfg.get("enabled", True):
+        try:
+            checkpoint_mgr = CheckpointManager(
+                swarm.task_id, cp_cfg.get("checkpoint_dir", "~/dytopo-checkpoints")
+            )
+        except Exception as e:
+            logger.warning(f"Checkpoint init failed (non-fatal): {e}")
+
+    stalemate_detector = None
+    if _HAS_STALEMATE:
+        stalemate_detector = StalemateDetector()
+
+    verifier = None
+    ver_cfg = config.get("verification", {})
+    if _HAS_VERIFIER and ver_cfg.get("enabled", False):
+        verifier = OutputVerifier(ver_cfg)
+
+    policy_enforcer = None
+    if _HAS_POLICY:
+        try:
+            policy_enforcer = PolicyEnforcer()
+        except Exception as e:
+            logger.warning(f"Policy enforcer init failed (non-fatal): {e}")
+
     swarm.status = SwarmStatus.RUNNING
 
     async def progress(event: str, data: dict):
@@ -545,6 +622,13 @@ async def run_swarm(
             round_record = RoundRecord(round_num=t, goal=round_goal)
             swarm.progress_message = f"Round {t}/{swarm.T_max}: {round_goal[:60]}..."
             await progress("manager_goal", {"round": t, "goal": round_goal})
+
+            # Checkpoint after manager goal
+            if checkpoint_mgr:
+                try:
+                    await checkpoint_mgr.save(swarm, f"round_{t}_goal")
+                except Exception as e:
+                    logger.warning(f"Checkpoint save failed (non-fatal): {e}")
 
             # ── Round 1: BROADCAST (no routing, parallel calls) ───────────────
             if t == 1 and config["routing"]["broadcast_round_1"]:
@@ -636,6 +720,13 @@ async def run_swarm(
                     "query": desc.query or f"{get_role_name(agent_state.role)} can proceed independently",
                 }
 
+            # Checkpoint after Phase A
+            if checkpoint_mgr:
+                try:
+                    await checkpoint_mgr.save(swarm, f"round_{t}_descriptors")
+                except Exception as e:
+                    logger.warning(f"Checkpoint save failed (non-fatal): {e}")
+
             # Phase B: Build routing graph (CPU-only, ~10-50ms)
             await progress("phase_routing", {"round": t})
             agent_ids = list(agent_map.keys())
@@ -654,7 +745,10 @@ async def run_swarm(
                 if trace_ctx.get("boost_applied"):
                     logger.info(f"Round {t}: trace boost applied from {trace_ctx.get('traces_used', 0)} traces")
             else:
-                routing = build_routing_result(agent_ids, descriptors, swarm.tau, swarm.K_in)
+                routing = build_routing_result(
+                    agent_ids, descriptors, swarm.tau, swarm.K_in,
+                    agent_roles=agent_role_map, round_context=round_goal,
+                )
             round_record.edges = routing["edges"]
             round_record.isolated_agents = routing["isolated"]
             round_record.removed_edges = routing["removed_edges"]
@@ -663,6 +757,33 @@ async def run_swarm(
             # Log routing to disk
             if config["logging"]["save_similarity_matrices"]:
                 log_routing_round(swarm.task_id, t, routing, config["logging"]["log_dir"])
+
+            # Stalemate detection after routing
+            if stalemate_detector:
+                try:
+                    # Use convergence similarity if available, else 0
+                    conv_score = 0.0
+                    if len(swarm.rounds) >= 2:
+                        rh = [{"round": r.round_num, "outputs": r.agent_outputs} for r in swarm.rounds]
+                        _, conv_score = detect_convergence(rh, window_size=2)
+                    stalemate_detector.record_round(routing["edges"], conv_score)
+                    stalemate_result = stalemate_detector.detect()
+                    if stalemate_result.is_stalled:
+                        logger.warning(
+                            f"Stalemate detected at round {t}: {stalemate_result.reason} "
+                            f"(action: {stalemate_result.suggested_action})"
+                        )
+                        audit.convergence_detected(
+                            t, f"Stalemate: {stalemate_result.reason}", 0.0
+                        )
+                        if stalemate_result.suggested_action == "force_terminate":
+                            swarm.termination_reason = "stalemate_force_terminate"
+                            swarm.final_answer = _extract_best_answer(swarm.rounds)
+                            swarm.status = SwarmStatus.COMPLETE
+                            swarm.end_time = time.monotonic()
+                            break
+                except Exception as e:
+                    logger.debug(f"Stalemate check failed (non-fatal): {e}")
 
             # Build execution graph and order
             G = build_execution_graph(routing["edges"], agent_ids)
@@ -733,6 +854,33 @@ async def run_swarm(
                         logger.error(f"Agent execution failed in tier {tier_idx}: {result}")
                         continue
                     agent_id, agent_state, descriptor, tokens = result
+
+                    # Verification gate (if verifier enabled)
+                    if verifier and descriptor.work:
+                        try:
+                            role_name = get_role_name(agent_state.role)
+                            vr = await verifier.verify(role_name, descriptor.work)
+                            if not vr.passed:
+                                logger.warning(
+                                    f"Verification failed for {agent_id} ({vr.method}): {vr.stderr}"
+                                )
+                                # One retry with fix_hint injected
+                                retry_desc, retry_tokens = await _call_worker(
+                                    agent_state, round_goal, swarm.task,
+                                    incoming_messages=[{
+                                        "role": "verifier",
+                                        "sim": 1.0,
+                                        "content": f"Fix needed: {vr.fix_hint}",
+                                    }],
+                                    domain=swarm.domain,
+                                    config=config,
+                                )
+                                descriptor = retry_desc
+                                tokens += retry_tokens
+                                swarm.total_llm_calls += 1
+                        except Exception as e:
+                            logger.debug(f"Verification check failed (non-fatal): {e}")
+
                     agent_state.descriptor = descriptor
                     agent_state.history.append(descriptor.model_dump())
                     round_outputs[agent_id] = descriptor
@@ -741,6 +889,13 @@ async def run_swarm(
                     swarm.total_tokens += tokens
 
                 await progress("tier_done", {"round": t, "tier": tier_idx, "agents": tier})
+
+            # Checkpoint after Phase C
+            if checkpoint_mgr:
+                try:
+                    await checkpoint_mgr.save(swarm, f"round_{t}_complete")
+                except Exception as e:
+                    logger.warning(f"Checkpoint save failed (non-fatal): {e}")
 
             round_record.duration_sec = time.monotonic() - round_start
             swarm.rounds.append(round_record)
@@ -853,6 +1008,13 @@ async def run_swarm(
 
             swarm.status = SwarmStatus.COMPLETE
             swarm.end_time = time.monotonic()
+
+            # Mark checkpoint completed
+            if checkpoint_mgr:
+                try:
+                    checkpoint_mgr.mark_completed()
+                except Exception as e:
+                    logger.warning(f"Checkpoint mark_completed failed (non-fatal): {e}")
 
             await progress("swarm_complete", {
                 "rounds": len(swarm.rounds),

@@ -1,0 +1,25 @@
+{
+  "rules": {
+    "file_write": {
+      "allow_paths": ["./workspace/*", "./output/*", "~/dytopo-logs/*", "~/dytopo-checkpoints/*"],
+      "deny_paths": ["./src/*", "./.git/*", "./config/*", "/etc/*"]
+    },
+    "file_read": {
+      "allow_paths": ["./workspace/*", "./output/*", "./docs/*", "./rag-docs/*"],
+      "deny_paths": ["./.env", "./.git/*", "~/.ssh/*"]
+    },
+    "shell_exec": {
+      "allow_commands": ["python", "pip", "node", "npm", "git status", "git log", "git diff"],
+      "deny_commands": ["rm -rf", "sudo", "chmod", "chown", "curl", "wget"],
+      "deny_patterns": ["|", "&&", ">>", "$("]
+    },
+    "network": {
+      "allow_hosts": ["localhost", "127.0.0.1"],
+      "allow_ports": [8008, 8009, 6333],
+      "deny_all_external": true
+    }
+  },
+  "enforcement": "strict",
+  "log_denials": true,
+  "on_denial": "return_error"
+}

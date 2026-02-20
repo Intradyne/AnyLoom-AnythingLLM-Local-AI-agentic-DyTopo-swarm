@@ -391,6 +391,192 @@ def detect_stalling(
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  STALEMATE DETECTION
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+@dataclass
+class StalemateResult:
+    """Result of stalemate detection analysis."""
+    is_stalled: bool
+    reason: str = ""
+    suggested_action: str = ""  # "generalist", "force_terminate", "human_in_loop", ""
+    stale_pair: tuple[str, str] | None = None
+
+
+class StalemateDetector:
+    """Detect systemic stalemates in the swarm routing topology.
+
+    Complements per-agent `detect_stalling()` by analyzing *routing patterns*
+    across rounds rather than individual agent outputs. Detects three patterns:
+
+    1. **Ping-pong**: Two agents routing to each other repeatedly without
+       involving others. Suggests injecting a generalist agent.
+    2. **No progress**: Convergence score unchanged (delta < 0.01) for
+       multiple rounds. Suggests forced termination.
+    3. **Regression**: Convergence score actively decreasing, indicating
+       the swarm is diverging. Suggests human intervention.
+    """
+
+    def __init__(self, max_ping_pong: int = 3, max_no_progress_rounds: int = 2):
+        self.max_ping_pong = max_ping_pong
+        self.max_no_progress_rounds = max_no_progress_rounds
+        self._edge_history: list[set[tuple[str, str]]] = []  # per-round edge sets
+        self._score_history: list[float] = []
+
+    def record_round(
+        self,
+        edges: list[tuple[str, str, float]],
+        convergence_score: float,
+    ) -> None:
+        """Record routing edges and convergence score for one round.
+
+        Args:
+            edges: List of (source_id, target_id, weight) tuples from routing
+            convergence_score: Current convergence similarity score [0, 1]
+        """
+        edge_set = {(src, tgt) for src, tgt, _ in edges}
+        self._edge_history.append(edge_set)
+        self._score_history.append(convergence_score)
+
+    def detect(self) -> StalemateResult:
+        """Analyze recorded rounds for stalemate patterns.
+
+        Returns:
+            StalemateResult with detection outcome and suggested action.
+        """
+        # Check ping-pong first (most specific)
+        pp = self._detect_ping_pong()
+        if pp.is_stalled:
+            return pp
+
+        # Check regression (more actionable than no-progress)
+        reg = self._detect_regression()
+        if reg.is_stalled:
+            return reg
+
+        # Check no-progress last
+        np_result = self._detect_no_progress()
+        if np_result.is_stalled:
+            return np_result
+
+        return StalemateResult(is_stalled=False)
+
+    def _detect_ping_pong(self) -> StalemateResult:
+        """Detect if two agents are routing to each other exclusively."""
+        if len(self._edge_history) < self.max_ping_pong:
+            return StalemateResult(is_stalled=False)
+
+        recent = self._edge_history[-self.max_ping_pong:]
+
+        # Find pairs that appear bidirectionally in ALL recent rounds
+        # A pair (A,B) is ping-pong if both (A,B) and (B,A) appear
+        all_pairs: dict[tuple[str, str], int] = {}
+        for edge_set in recent:
+            for src, tgt in edge_set:
+                pair = tuple(sorted([src, tgt]))
+                # Check if reverse also exists in this round
+                if (tgt, src) in edge_set:
+                    all_pairs[pair] = all_pairs.get(pair, 0) + 1
+
+        for pair, count in all_pairs.items():
+            if count >= self.max_ping_pong:
+                logger.warning(
+                    f"Ping-pong stalemate detected: {pair[0]} ↔ {pair[1]} "
+                    f"for {count} consecutive rounds"
+                )
+                return StalemateResult(
+                    is_stalled=True,
+                    reason=f"Ping-pong between {pair[0]} and {pair[1]} for {count} rounds",
+                    suggested_action="generalist",
+                    stale_pair=pair,
+                )
+
+        return StalemateResult(is_stalled=False)
+
+    def _detect_no_progress(self) -> StalemateResult:
+        """Detect if convergence score is flat (no progress)."""
+        needed = self.max_no_progress_rounds + 1  # need N+1 scores to compute N deltas
+        if len(self._score_history) < needed:
+            return StalemateResult(is_stalled=False)
+
+        recent = self._score_history[-needed:]
+        deltas = [abs(recent[i+1] - recent[i]) for i in range(len(recent) - 1)]
+
+        if all(d < 0.01 for d in deltas):
+            logger.warning(
+                f"No-progress stalemate: convergence unchanged for "
+                f"{self.max_no_progress_rounds} rounds (scores: {recent})"
+            )
+            return StalemateResult(
+                is_stalled=True,
+                reason=f"Convergence unchanged (delta < 0.01) for {self.max_no_progress_rounds} rounds",
+                suggested_action="force_terminate",
+            )
+
+        return StalemateResult(is_stalled=False)
+
+    def _detect_regression(self) -> StalemateResult:
+        """Detect if convergence is actively decreasing (diverging)."""
+        if len(self._score_history) < 3:
+            return StalemateResult(is_stalled=False)
+
+        recent = self._score_history[-3:]
+        if recent[2] < recent[1] < recent[0]:
+            logger.warning(
+                f"Convergence regression detected: scores decreasing "
+                f"{recent[0]:.3f} → {recent[1]:.3f} → {recent[2]:.3f}"
+            )
+            return StalemateResult(
+                is_stalled=True,
+                reason=f"Convergence regressing: {recent[0]:.3f} → {recent[1]:.3f} → {recent[2]:.3f}",
+                suggested_action="human_in_loop",
+            )
+
+        return StalemateResult(is_stalled=False)
+
+
+def get_generalist_fallback_agent(
+    agent_states: dict[str, Any],
+    stale_pair: tuple[str, str] | None,
+) -> str | None:
+    """Select a fallback agent to break a stalemate.
+
+    Picks the agent NOT in the stale pair that has been used least
+    (fewest rounds participated), to inject fresh perspective.
+
+    Args:
+        agent_states: Dict mapping agent_id to state dicts with "metrics"
+        stale_pair: The two agents caught in ping-pong (or None)
+
+    Returns:
+        Agent ID of the suggested generalist, or None if no candidates.
+    """
+    if not agent_states:
+        return None
+
+    excluded = set(stale_pair) if stale_pair else set()
+    candidates = []
+
+    for aid, state in agent_states.items():
+        if aid in excluded:
+            continue
+        metrics = state.get("metrics", {}) if isinstance(state, dict) else {}
+        rounds = metrics.get("total_rounds", 0)
+        candidates.append((aid, rounds))
+
+    if not candidates:
+        return None
+
+    # Sort by least used (fewest rounds)
+    candidates.sort(key=lambda x: x[1])
+    selected = candidates[0][0]
+
+    logger.info(f"Generalist fallback selected: {selected} (least used, {candidates[0][1]} rounds)")
+    return selected
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  RE-DELEGATION RECOMMENDATIONS
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 

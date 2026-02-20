@@ -31,22 +31,65 @@ def _get_routing_model():
     return _routing_model
 
 
+def prepare_descriptor_for_embedding(
+    descriptor: str,
+    agent_role: str = "",
+    round_context: str = "",
+) -> str:
+    """Enrich a descriptor with role and context for better semantic routing.
+
+    Prefixes the descriptor with role and context information to improve
+    embedding separation between agents with similar descriptions.
+
+    Args:
+        descriptor: Raw descriptor text (key or query)
+        agent_role: Agent's role name (e.g., "developer", "researcher")
+        round_context: Brief context for the current round goal
+
+    Returns:
+        Enriched descriptor string, kept concise for MiniLM's 256-token limit
+    """
+    parts = []
+    if agent_role:
+        parts.append(f"As a {agent_role}:")
+    if round_context:
+        parts.append(f"[{round_context[:50]}]")
+    parts.append(descriptor)
+    return " ".join(parts)
+
+
 def embed_descriptors(
     agent_ids: list[str],
     descriptors: dict[str, dict],  # {agent_id: {"key": str, "query": str}}
+    agent_roles: dict[str, str] | None = None,
+    round_context: str = "",
 ) -> tuple[np.ndarray, np.ndarray]:
     """Embed all keys and queries. Returns (key_vectors, query_vectors), each shape (N, 384).
+
+    When agent_roles is provided, descriptors are enriched via
+    prepare_descriptor_for_embedding() before encoding to improve semantic
+    separation between agents with similar raw descriptions.
 
     Args:
         agent_ids: Ordered list of agent IDs
         descriptors: Dict mapping agent_id to {"key": str, "query": str}
+        agent_roles: Optional dict mapping agent_id to role name for enrichment
+        round_context: Optional round context string for enrichment
 
     Returns:
         Tuple of (key_vectors, query_vectors), both shape (N, 384), dtype float32
     """
     model = _get_routing_model()
-    keys = [descriptors[aid]["key"] for aid in agent_ids]
-    queries = [descriptors[aid]["query"] for aid in agent_ids]
+    keys = []
+    queries = []
+    for aid in agent_ids:
+        key_text = descriptors[aid]["key"]
+        query_text = descriptors[aid]["query"]
+        if agent_roles and aid in agent_roles:
+            key_text = prepare_descriptor_for_embedding(key_text, agent_roles[aid], round_context)
+            query_text = prepare_descriptor_for_embedding(query_text, agent_roles[aid], round_context)
+        keys.append(key_text)
+        queries.append(query_text)
 
     # Batch encode — all keys then all queries in one call for efficiency
     all_texts = keys + queries
@@ -146,14 +189,21 @@ def build_routing_result(
     descriptors: dict[str, dict],
     tau: float,
     K_in: int,
+    agent_roles: dict[str, str] | None = None,
+    round_context: str = "",
 ) -> dict:
     """Full routing pipeline: embed → similarity → threshold → degree cap.
+
+    When agent_roles and/or round_context are provided, descriptors are enriched
+    before embedding to improve semantic separation between similar agents.
 
     Args:
         agent_ids: Ordered list of agent IDs
         descriptors: Dict mapping agent_id to {"key": str, "query": str}
         tau: Similarity threshold
         K_in: Max incoming edges per agent
+        agent_roles: Optional dict mapping agent_id to role name for enrichment
+        round_context: Optional round context string for enrichment
 
     Returns:
         Dict with keys:
@@ -165,7 +215,7 @@ def build_routing_result(
             removed_edges: list[tuple[str, str]]
             stats: dict with edge_count, density, mean_sim, max_sim, min_active_sim
     """
-    key_vecs, query_vecs = embed_descriptors(agent_ids, descriptors)
+    key_vecs, query_vecs = embed_descriptors(agent_ids, descriptors, agent_roles, round_context)
     S = compute_similarity_matrix(query_vecs, key_vecs)
     A = apply_threshold(S, tau)
     A, removed_idx = enforce_max_indegree(A, S, K_in)
@@ -202,6 +252,59 @@ def build_routing_result(
         "removed_edges": removed_named,
         "stats": stats,
     }
+
+
+def validate_descriptor_separation(
+    agent_ids: list[str],
+    descriptors: dict[str, dict],
+    agent_roles: dict[str, str] | None = None,
+    round_context: str = "",
+) -> dict:
+    """Check if descriptors have sufficient semantic separation for routing.
+
+    Warns about potential routing issues:
+    - Key-key similarity > 0.7 (agents offering same thing)
+    - All key-query similarities < 0.4 (no meaningful routing possible)
+
+    Args:
+        agent_ids: List of agent IDs
+        descriptors: Agent descriptors with key/query
+        agent_roles: Optional role mapping for enrichment
+        round_context: Optional round context
+
+    Returns:
+        Dict with "warnings" list and "mean_similarity" float
+    """
+    key_vecs, query_vecs = embed_descriptors(agent_ids, descriptors, agent_roles, round_context)
+    S = compute_similarity_matrix(query_vecs, key_vecs)
+
+    # Key-key similarity (agents offering similar things)
+    key_sim = key_vecs @ key_vecs.T
+    np.fill_diagonal(key_sim, 0.0)
+
+    warnings = []
+    N = len(agent_ids)
+
+    for i in range(N):
+        for j in range(i + 1, N):
+            if key_sim[i][j] > 0.7:
+                warnings.append(
+                    f"High key-key similarity ({key_sim[i][j]:.2f}) between "
+                    f"{agent_ids[i]} and {agent_ids[j]} — they may offer redundant capabilities"
+                )
+
+    # Check if any meaningful routing is possible
+    if S.max() < 0.4 and N > 1:
+        warnings.append(
+            f"Max query-key similarity is only {S.max():.2f} — "
+            f"no edges will form at typical tau=0.5. Consider revising descriptors."
+        )
+
+    for w in warnings:
+        logger.warning(f"Descriptor separation: {w}")
+
+    mean_sim = float(S[S > 0].mean()) if (S > 0).any() else 0.0
+    return {"warnings": warnings, "mean_similarity": mean_sim}
 
 
 def log_routing_round(

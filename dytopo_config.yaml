@@ -40,3 +40,24 @@ health_monitor:
   crash_window_minutes: 15
   alert_cooldown_minutes: 30
   log_dir: "~/anyloom-logs"
+
+# Checkpoint settings
+checkpoint:
+  enabled: true
+  checkpoint_dir: "~/dytopo-checkpoints"
+  save_per_agent: false
+
+# Verification settings (disabled by default)
+verification:
+  enabled: false
+  max_retries: 1
+  specs:
+    developer:
+      type: "syntax_check"
+      timeout_seconds: 10
+    researcher:
+      type: "schema_validation"
+      required_fields: ["sources", "summary"]
+    solver:
+      type: "syntax_check"
+      timeout_seconds: 30

@@ -4,7 +4,7 @@ DyTopo (arXiv 2602.06039) dynamically constructs agent communication topology ea
 
 ## Package Architecture
 
-DyTopo is a standalone Python package at `src/dytopo/` with 9 core modules and 6 sub-packages. The MCP server (`src/qdrant_mcp_server.py`) exposes 3 swarm tools (`swarm_start`, `swarm_status`, `swarm_result`) plus 5 RAG tools that delegate to it.
+DyTopo is a standalone Python package at `src/dytopo/` with 12 core modules and 6 sub-packages. The MCP server (`src/qdrant_mcp_server.py`) exposes 3 swarm tools (`swarm_start`, `swarm_status`, `swarm_result`) plus 5 RAG tools that delegate to it.
 
 ### Core Modules
 
@@ -13,11 +13,14 @@ DyTopo is a standalone Python package at `src/dytopo/` with 9 core modules and 6
 | `models.py` | Pydantic v2 data models: `AgentRole`, `SwarmDomain`, `AgentDescriptor`, `AgentState`, `AgentMetrics`, `SwarmMetrics`, `RoundRecord`, `ManagerDecision`, `SwarmStatus`, `SwarmTask`, `SwarmMemoryRecord`, `HealthStatus`, `StackHealth`, `AegeanVote` |
 | `config.py` | YAML configuration loader — merges `dytopo_config.yaml` over built-in `_DEFAULTS`; includes `concurrency` section for backend selection |
 | `agents.py` | System prompts keyed by `(SwarmDomain, AgentRole)`, JSON schemas (`DESCRIPTOR_SCHEMA`, `AGENT_OUTPUT_SCHEMA`, `MANAGER_OUTPUT_SCHEMA`), prompt templates, `build_agent_roster()`, `get_system_prompt()`, `get_role_name()`, `get_worker_names()` |
-| `router.py` | Lazy singleton MiniLM-L6-v2, `embed_descriptors()`, `compute_similarity_matrix()`, `apply_threshold()`, `enforce_max_indegree()`, `build_routing_result()`, `log_routing_round()` |
+| `router.py` | Lazy singleton MiniLM-L6-v2, `embed_descriptors()`, `compute_similarity_matrix()`, `apply_threshold()`, `enforce_max_indegree()`, `build_routing_result()`, `log_routing_round()`, `prepare_descriptor_for_embedding()` (intent enrichment), `validate_descriptor_separation()` |
 | `stigmergic_router.py` | `StigmergicRouter` class wrapping functional routing with trace-aware topology: `build_topology()` (blends similarity matrix with time-decayed historical trace boost), `deposit_trace()` (persists swarm routing patterns to Qdrant `swarm_traces` collection), `get_trace_stats()`, `prune_old_traces()`. `build_trace_edges()` helper converts routing edges to trace format. Uses 384-dim MiniLM-L6-v2 embeddings, configurable via `traces` section in config |
 | `graph.py` | `build_execution_graph()` (NetworkX DiGraph), `break_cycles()` (greedy lowest-weight removal), `get_execution_order()` (Kahn's with alphabetical tiebreak), `get_execution_tiers()` (parallel-within-tier ordering via `nx.topological_generations()`), `get_incoming_agents()` |
-| `orchestrator.py` | Backend-agnostic LLM client via `_get_llm_client()` (connects to llama.cpp on port 8008), semaphore-based concurrency via `_get_semaphore()` (8 concurrent), `_llm_call()` with tenacity retry (3 attempts, exponential backoff), `_call_manager()`, `_call_worker()`, `run_swarm()` main loop with parallelized phases via `asyncio.gather()` |
-| `governance.py` | `execute_agent_safe()`, `detect_convergence()`, `detect_stalling()`, `recommend_redelegation()`, `update_agent_metrics()`, `compute_consensus_matrix()`, `check_aegean_termination()` |
+| `orchestrator.py` | Backend-agnostic LLM client via `_get_llm_client()` (connects to llama.cpp on port 8008), semaphore-based concurrency via `_get_semaphore()` (8 concurrent), `_llm_call()` with tenacity retry (3 attempts, exponential backoff), `_call_manager()`, `_call_worker()`, `run_swarm()` main loop with parallelized phases via `asyncio.gather()`. Integrates checkpoint, policy, verifier, and stalemate modules via guarded imports (`_HAS_CHECKPOINT`, `_HAS_STALEMATE`, `_HAS_VERIFIER`, `_HAS_POLICY` flags) |
+| `governance.py` | `execute_agent_safe()`, `detect_convergence()`, `detect_stalling()`, `recommend_redelegation()`, `update_agent_metrics()`, `compute_consensus_matrix()`, `check_aegean_termination()`, `StalemateDetector` (ping-pong, no-progress, regression detection), `StalemateResult`, `get_generalist_fallback_agent()` |
+| `checkpoint.py` | `CheckpointManager` — atomic crash-recovery persistence of `SwarmTask` state. Uses `os.replace()` for atomic writes, Pydantic v2 `model_dump(mode="json")` / `model_validate()` round-trip, envelope format with version and timestamps. Methods: `save()`, `load_latest()`, `list_hot_tasks()`, `mark_completed()`, `cleanup()` |
+| `policy.py` | `PolicyEnforcer` (PCAS-Lite) — deny-first tool-call policy enforcement from `policy.json`. Evaluates file read/write, shell exec, and network operations. Path traversal prevention via resolved absolute paths. `PolicyDecision` dataclass. Methods: `check_tool_request()`, `enforce()` |
+| `verifier.py` | `OutputVerifier` — deterministic output verification (no LLM calls). Dispatches to `_check_python_syntax()` (via `ast.parse()`), `_check_schema()` (JSON required-fields validation), `_execute_code()` (sandboxed subprocess). Fail-open policy: infrastructure errors default to PASS. `VerificationResult` dataclass |
 | `audit.py` | `SwarmAuditLog` class — JSONL event logging to `~/dytopo-logs/{task_id}/audit.jsonl` |
 
 ### Sub-packages
@@ -71,6 +74,23 @@ health_monitor:
   crash_window_minutes: 15
   alert_cooldown_minutes: 30
   log_dir: "~/anyloom-logs"
+checkpoint:
+  enabled: true               # Enable checkpoint crash recovery
+  checkpoint_dir: "~/dytopo-checkpoints"
+  save_per_agent: false        # Save per-agent checkpoints (verbose)
+verification:
+  enabled: false               # Enable deterministic output verification
+  max_retries: 1               # Retries before accepting failed verification
+  specs:                        # Per-role verification specs
+    developer:
+      type: "syntax_check"     # ast.parse() Python syntax check
+      timeout_seconds: 10
+    researcher:
+      type: "schema_validation"
+      required_fields: ["sources", "summary"]
+    solver:
+      type: "syntax_check"
+      timeout_seconds: 30
 ```
 
 ## Round Lifecycle
@@ -79,9 +99,9 @@ health_monitor:
 2. **Round 1 — broadcast:** all agents see all outputs (no routing yet); agent calls are parallelized via `asyncio.gather()`
 3. **Rounds 2+ — three-phase split:**
    - Phase A: each agent generates key/query descriptors only (fast, `/no_think`, temp 0.1, 256 tokens); descriptor generation is parallelized via `asyncio.gather()`
-   - Phase B: MiniLM embeds descriptors -> cosine similarity matrix -> optional stigmergic trace boost (blends historical routing patterns via time-decayed role-pair matrix) -> threshold tau -> directed graph -> cycle breaking -> topological tiers via `get_execution_tiers()`
-   - Phase C: agents execute tier-by-tier with `asyncio.gather()` within each tier; agents in the same tier run in parallel, later tiers wait for earlier tiers to complete; routed messages injected (temp 0.3, 4096 tokens)
-4. **Governance checks:** convergence detection, stalling detection, re-delegation recommendations
+   - Phase B: MiniLM embeds descriptors (with `prepare_descriptor_for_embedding()` intent enrichment) -> cosine similarity matrix -> optional stigmergic trace boost (blends historical routing patterns via time-decayed role-pair matrix) -> threshold tau -> directed graph -> cycle breaking -> topological tiers via `get_execution_tiers()`. Optional `validate_descriptor_separation()` check for routing quality
+   - Phase C: agents execute tier-by-tier with `asyncio.gather()` within each tier; agents in the same tier run in parallel, later tiers wait for earlier tiers to complete; routed messages injected (temp 0.3, 4096 tokens). If verification is enabled, each agent output passes through `OutputVerifier` (syntax check / schema validation / code execution). If policy enforcement is enabled, tool calls are gated by `PolicyEnforcer` before execution. Checkpoints saved after each step when enabled
+4. **Governance checks:** convergence detection, stalling detection, re-delegation recommendations, stalemate detection (ping-pong, no-progress, regression patterns)
 5. **Audit logging:** all events logged to JSONL for observability
 
 ## Three-Phase Architecture
@@ -172,6 +192,45 @@ The swarm server stores up to 20 concurrent tasks in `_swarm_tasks` dict and evi
 - **Integration**: Runs at the start of `run_swarm()`. If LLM is unreachable, the swarm aborts with `RuntimeError`. Other component failures are logged as warnings
 - **Models**: `HealthStatus` and `StackHealth` Pydantic models track per-component health with latency
 - **Health Monitor Sidecar** (`scripts/health_monitor.py`): Standalone Python process that reuses `HealthChecker` for continuous monitoring (every 30s), auto-restarts failed Docker containers, and logs structured JSONL. Separate from the swarm — runs independently alongside the Docker stack
+
+### Stalemate Detection
+
+The `StalemateDetector` class in `governance.py` complements per-agent `detect_stalling()` by analyzing *routing patterns* across rounds rather than individual agent outputs. It detects three patterns:
+
+1. **Ping-pong**: Two agents routing to each other repeatedly without involving others. Suggests injecting a generalist fallback agent via `get_generalist_fallback_agent()`.
+2. **No progress**: Convergence score unchanged (delta < 0.01) for multiple rounds. Suggests forced termination.
+3. **Regression**: Convergence score actively decreasing, indicating the swarm is diverging. Suggests human-in-the-loop intervention.
+
+Returns a `StalemateResult` dataclass with `is_stalled`, `reason`, `suggested_action`, and `stale_pair`. The orchestrator calls `StalemateDetector.check()` after governance checks when `_HAS_STALEMATE` is True.
+
+### Checkpoint Recovery
+
+The `CheckpointManager` class in `checkpoint.py` persists `SwarmTask` state to disk after each orchestration step so that a crashed or interrupted run can be resumed from the last good checkpoint.
+
+- **Atomic writes**: Each save writes to a temp file, then calls `os.replace()` (atomic on POSIX, near-atomic on Windows same-volume rename).
+- **Pydantic v2 round-trip**: `model_dump(mode="json")` for serialization, `model_validate()` for deserialization.
+- **Envelope format**: Every checkpoint JSON carries `__checkpoint_version__`, `__step_label__`, and ISO-8601 `__timestamp__` metadata alongside the task payload.
+- **Hot task scanning**: `list_hot_tasks()` finds incomplete tasks (no `_completed` marker) for automated resume.
+- **Configuration**: Controlled via `checkpoint` section in `dytopo_config.yaml`. Enabled by default; checkpoints stored in `~/dytopo-checkpoints/`.
+
+### Policy Enforcement
+
+The `PolicyEnforcer` class in `policy.py` implements PCAS-Lite (Policy-Controlled Agent Sandbox, Lite edition) for deny-first tool-call policy enforcement.
+
+- **Policy file**: Rules loaded from `policy.json` at the project root. Defines allow/deny patterns for file read/write, shell exec, and network operations.
+- **Deny-first evaluation**: Deny rules are checked first; if ANY deny matches, the request is blocked immediately. Allow rules are checked next. Default action is deny if no allow rule matches.
+- **Path traversal prevention**: All file paths are resolved to absolute before matching, preventing `../` escape attacks.
+- **Integration**: The orchestrator checks `PolicyEnforcer.enforce()` before executing tool calls when `_HAS_POLICY` is True. Returns `None` if allowed, or an error dict if denied.
+
+### Silent Verification
+
+The `OutputVerifier` class in `verifier.py` provides deterministic output verification for agent work products without any LLM calls.
+
+- **Verification strategies**: `syntax_check` (Python syntax via `ast.parse()`), `schema_validation` (JSON required-fields check), `code_execution` (sandboxed subprocess with timeout).
+- **Fail-open policy**: Any infrastructure error results in `passed=True` so the swarm pipeline is never blocked by the verifier itself.
+- **Code block extraction**: Automatically extracts fenced code blocks from markdown output before verification.
+- **Per-role configuration**: Verification specs are configured per agent role in the `verification.specs` section of `dytopo_config.yaml`.
+- **Integration**: The orchestrator runs `OutputVerifier.verify()` after each agent execution in Phase C when `_HAS_VERIFIER` is True. Failed verifications are logged but do not crash the pipeline.
 
 ## Error Isolation
 

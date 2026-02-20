@@ -811,6 +811,7 @@ But `docker compose` is recommended for easier management!
 - **Start the health monitor** — `python scripts/health_monitor.py` for always-on monitoring and auto-recovery
 - **Explore DyTopo** — Multi-agent swarm orchestration with stigmergic routing (see `docs/dytopo-swarm.md`)
 - **Review MCP tools** — 8 MCP servers for RAG, swarm, memory, web, files, and diagnostics (see `docs/qdrant-servers.md`)
+- **Review policy.json** — The `policy.json` file at the project root defines deny-first tool-call policies for the DyTopo PolicyEnforcer (PCAS-Lite). Edit this file to customize which file paths, shell commands, and network hosts are allowed or denied during swarm execution. See `docs/dytopo-swarm.md` for details.
 
 ---
 

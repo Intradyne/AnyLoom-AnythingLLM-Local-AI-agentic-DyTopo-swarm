@@ -69,6 +69,20 @@ _DEFAULTS = {
         "alert_cooldown_minutes": 30,
         "log_dir": "~/anyloom-logs",
     },
+    "checkpoint": {
+        "enabled": True,
+        "checkpoint_dir": "~/dytopo-checkpoints",
+        "save_per_agent": False,
+    },
+    "verification": {
+        "enabled": False,
+        "max_retries": 1,
+        "specs": {
+            "developer": {"type": "syntax_check", "timeout_seconds": 10},
+            "researcher": {"type": "schema_validation", "required_fields": ["sources", "summary"]},
+            "solver": {"type": "syntax_check", "timeout_seconds": 30},
+        },
+    },
 }
 
 

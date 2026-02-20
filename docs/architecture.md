@@ -76,6 +76,10 @@
          │   • AsyncOpenAI → localhost:8008             │
          │   • Semaphore-based concurrency (2 slots)    │
          │   • Aegean consensus termination             │
+         │   • Checkpoint crash recovery (atomic writes) │
+         │   • PolicyEnforcer deny-first tool gating     │
+         │   • Silent output verification (no LLM)      │
+         │   • Stalemate detection + generalist fallback │
          │                                              │
          │  Health Monitor (scripts/health_monitor.py)  │
          │   • Probes all 4 containers every 30s        │
@@ -148,6 +152,6 @@ llama.cpp loads the Q4_K_M GGUF model file directly (~18.6 GiB on disk, same in 
 
 **MCP server — system-status** (`src/mcp_servers/system_status_mcp.py`) runs natively as a Python process. Exposes 6 diagnostic tools: `service_health`, `qdrant_collections`, `gpu_status`, `llm_slots`, `docker_status`, `stack_config`. Reuses the `HealthChecker` class from DyTopo for service probes.
 
-**DyTopo swarm** (`src/dytopo/`) is a dedicated Python package with 8 core modules and 6 sub-packages. Core: `models.py` (Pydantic v2), `config.py` (YAML), `agents.py` (prompts, schemas, domain rosters), `router.py` (MiniLM-L6-v2 cosine similarity routing), `stigmergic_router.py` (trace-aware topology with Qdrant-persisted swarm traces and time-decayed boost matrix), `graph.py` (NetworkX DAG, topological tiers), `orchestrator.py` (async parallel swarm with semaphore concurrency, Aegean consensus termination), `governance.py` (convergence/stalling detection), `audit.py` (JSONL logging). Sub-packages: `observability/`, `safeguards/`, `messaging/`, `routing/`, `delegation/`, `documentation/`.
+**DyTopo swarm** (`src/dytopo/`) is a dedicated Python package with 12 core modules and 6 sub-packages. Core: `models.py` (Pydantic v2), `config.py` (YAML, including `checkpoint` and `verification` sections), `agents.py` (prompts, schemas, domain rosters), `router.py` (MiniLM-L6-v2 cosine similarity routing, intent embedding enrichment, descriptor separation validation), `stigmergic_router.py` (trace-aware topology with Qdrant-persisted swarm traces and time-decayed boost matrix), `graph.py` (NetworkX DAG, topological tiers), `orchestrator.py` (async parallel swarm with semaphore concurrency, Aegean consensus termination; integrates checkpoint, policy, verifier, and stalemate modules via guarded imports with `_HAS_*` flags), `governance.py` (convergence/stalling detection, `StalemateDetector`, `get_generalist_fallback_agent()`), `checkpoint.py` (CheckpointManager for atomic crash-recovery persistence), `policy.py` (PolicyEnforcer PCAS-Lite deny-first tool-call gating), `verifier.py` (OutputVerifier for deterministic syntax and schema checks, no LLM), `audit.py` (JSONL logging). Sub-packages: `observability/`, `safeguards/`, `messaging/`, `routing/`, `delegation/`, `documentation/`.
 
 **Health Monitor** (`scripts/health_monitor.py`) is a standalone Python sidecar (no LLM inference). Probes all 4 Docker containers + GPU every 30 seconds, auto-restarts failed containers via `docker restart`, with crash window protection (3 attempts per 15 minutes) and alert cooldown (30 minutes). Logs structured JSONL to `~/anyloom-logs/health.jsonl`. Configurable via `dytopo_config.yaml` or environment variables.

@@ -1,0 +1,16 @@
+{"timestamp": "2025-01-15T10:00:00", "event_type": "swarm_started", "round": 0, "task_id": "test123", "query": "Build a REST API", "max_rounds": 5, "agents": ["developer", "researcher", "tester"]}
+{"timestamp": "2025-01-15T10:00:01", "event_type": "round_started", "round": 1, "task_id": "test123"}
+{"timestamp": "2025-01-15T10:00:05", "event_type": "agent_executed", "round": 1, "task_id": "test123", "agent_name": "developer", "output": "Implemented basic REST endpoints", "execution_time": 3.5}
+{"timestamp": "2025-01-15T10:00:06", "event_type": "agent_executed", "round": 1, "task_id": "test123", "agent_name": "researcher", "output": "Found best practices for REST API design", "execution_time": 2.1}
+{"timestamp": "2025-01-15T10:00:07", "event_type": "agent_executed", "round": 1, "task_id": "test123", "agent_name": "tester", "output": "Created test plan for endpoints", "execution_time": 1.8}
+{"timestamp": "2025-01-15T10:00:10", "event_type": "round_started", "round": 2, "task_id": "test123"}
+{"timestamp": "2025-01-15T10:00:11", "event_type": "routing_computed", "round": 2, "task_id": "test123", "router_output": {"developer": [{"agent": "researcher", "similarity": 0.73}], "tester": [{"agent": "developer", "similarity": 0.81}]}, "selected_agents": ["developer", "tester"]}
+{"timestamp": "2025-01-15T10:00:15", "event_type": "agent_executed", "round": 2, "task_id": "test123", "agent_name": "developer", "output": "Refined API with authentication middleware", "execution_time": 4.2}
+{"timestamp": "2025-01-15T10:00:16", "event_type": "agent_executed", "round": 2, "task_id": "test123", "agent_name": "tester", "output": "Added integration tests for auth flow", "execution_time": 3.0}
+{"timestamp": "2025-01-15T10:00:17", "event_type": "agent_failed", "round": 2, "task_id": "test123", "agent_name": "researcher", "error": "Timeout after 10s"}
+{"timestamp": "2025-01-15T10:00:20", "event_type": "round_started", "round": 3, "task_id": "test123"}
+{"timestamp": "2025-01-15T10:00:21", "event_type": "routing_computed", "round": 3, "task_id": "test123", "router_output": {"developer": [{"agent": "tester", "similarity": 0.85}], "tester": [{"agent": "developer", "similarity": 0.82}]}, "selected_agents": ["developer", "tester"]}
+{"timestamp": "2025-01-15T10:00:25", "event_type": "agent_executed", "round": 3, "task_id": "test123", "agent_name": "developer", "output": "Final implementation complete", "execution_time": 3.8}
+{"timestamp": "2025-01-15T10:00:26", "event_type": "agent_executed", "round": 3, "task_id": "test123", "agent_name": "tester", "output": "All tests passing", "execution_time": 2.5}
+{"timestamp": "2025-01-15T10:00:27", "event_type": "convergence_detected", "round": 3, "task_id": "test123", "reason": "Outputs stabilized", "confidence": 0.92}
+{"timestamp": "2025-01-15T10:00:28", "event_type": "swarm_completed", "round": 3, "task_id": "test123", "final_output": "REST API with auth middleware and tests", "total_rounds": 3}

@@ -188,6 +188,122 @@ print(stats)  # Check point count
 
 ---
 
+### Issue: Checkpoint Recovery Issues
+
+**Symptoms:**
+- Swarm does not resume from previous checkpoint after crash
+- `CheckpointManager.load_latest()` returns `None`
+- Corrupt checkpoint warnings in logs
+
+**Diagnosis:**
+```bash
+# Check checkpoint directory exists and has files
+ls -la ~/dytopo-checkpoints/
+
+# Check for specific task checkpoints
+ls -la ~/dytopo-checkpoints/{task_id}/
+
+# Look for corrupt checkpoint warnings in logs
+grep "Skipping corrupt checkpoint" ~/dytopo-logs/*/audit.jsonl
+```
+
+**Solutions:**
+- **No checkpoint directory**: Verify `checkpoint.enabled: true` and `checkpoint.checkpoint_dir` in `dytopo_config.yaml`
+- **Corrupt checkpoints**: The manager skips corrupt files automatically and tries the next oldest. If all are corrupt, the swarm starts fresh
+- **Stale hot tasks**: `list_hot_tasks()` returns tasks without a `_completed` marker. Call `mark_completed()` after successful runs or `cleanup()` to remove stale checkpoints
+- **Disk full**: Checkpoints accumulate per-task. Run `CheckpointManager.cleanup()` for old task IDs or delete `~/dytopo-checkpoints/` manually
+
+---
+
+### Issue: Policy Enforcement Blocks
+
+**Symptoms:**
+- Agent tool calls rejected with `"error": "policy_denied"`
+- Unexpected `PolicyDecision(allowed=False)` results
+- Swarm cannot write files or execute commands needed for the task
+
+**Diagnosis:**
+```bash
+# Check policy file exists and is valid JSON
+python -c "import json; json.load(open('policy.json'))"
+
+# Check for policy denial logs
+grep "Policy denied" ~/dytopo-logs/*/audit.jsonl
+```
+
+```python
+from dytopo.policy import PolicyEnforcer
+enforcer = PolicyEnforcer()
+# Test a specific file path
+result = enforcer.check_tool_request("file_write", {"path": "/tmp/test.txt"})
+print(result)
+# Test a specific command
+result = enforcer.check_tool_request("shell_exec", {"command": "python test.py"})
+print(result)
+```
+
+**Solutions:**
+- **Legitimate tool call blocked**: Add the path or command to the `allow_paths` / `allow_commands` list in `policy.json`
+- **Path traversal false positive**: The enforcer resolves all paths to absolute. Check that your `allow_paths` patterns match the resolved absolute path
+- **Missing policy.json**: Without a policy file, all requests are allowed. If the file is missing unexpectedly, create one from the template
+- **Enforcement mode**: Set `"enforcement": "permissive"` in `policy.json` to log denials without blocking (useful for debugging)
+
+---
+
+### Issue: Verification Gate Failures
+
+**Symptoms:**
+- Agent outputs flagged by `OutputVerifier` with `passed=False`
+- `VerificationResult` shows syntax errors or missing JSON fields
+- Swarm rounds produce lower-quality outputs than expected
+
+**Diagnosis:**
+```python
+from dytopo.verifier import OutputVerifier
+
+config = {"enabled": True, "specs": {"developer": {"type": "syntax_check"}}}
+verifier = OutputVerifier(config)
+result = await verifier.verify("developer", agent_output)
+print(f"Passed: {result.passed}, Method: {result.method}")
+if not result.passed:
+    print(f"Error: {result.stderr}")
+    print(f"Fix hint: {result.fix_hint}")
+```
+
+**Solutions:**
+- **Syntax check failures**: The verifier extracts Python code from markdown fences. If the agent output wraps code in unusual formatting, the extraction may fail. Check `fix_hint` for the specific syntax error
+- **Schema validation failures**: Ensure the agent's JSON output contains all `required_fields` defined in the verification spec
+- **Code execution timeouts**: Increase `timeout_seconds` in the verification spec for the affected role
+- **False positives from infrastructure errors**: The verifier is fail-open by design — infrastructure errors return `passed=True`. If you see unexpected failures, check the `method` field to confirm which verification strategy ran
+- **Disable for specific roles**: Remove the role from `verification.specs` in `dytopo_config.yaml` to skip verification for that role
+
+---
+
+### Issue: Stalemate Detection False Positives
+
+**Symptoms:**
+- `StalemateDetector` reports stalemate when the swarm is making progress
+- Generalist fallback agent injected unnecessarily
+- Forced termination triggered too early
+
+**Diagnosis:**
+```python
+from dytopo.governance import StalemateDetector, StalemateResult
+
+detector = StalemateDetector()
+result = detector.check(round_history, convergence_scores)
+print(f"Stalled: {result.is_stalled}, Reason: {result.reason}")
+print(f"Action: {result.suggested_action}, Pair: {result.stale_pair}")
+```
+
+**Solutions:**
+- **Ping-pong false positive**: Two agents routing to each other can be legitimate collaboration. If the convergence score is improving, the stalemate detection may be too aggressive. This pattern requires 3+ consecutive rounds of bidirectional routing to trigger
+- **No-progress false positive**: The detector flags convergence score changes < 0.01 as stalled. If your task naturally has a long plateau before improvement, consider adjusting the convergence threshold in config
+- **Regression false positive**: Temporary convergence score dips can happen when new information is introduced. The detector requires sustained regression over 2+ rounds
+- **Disable stalemate detection**: Set `_HAS_STALEMATE = False` in the orchestrator (not recommended for production) or handle the `StalemateResult` at the orchestrator level
+
+---
+
 ## Performance Optimization Checklist
 
 - [ ] Run performance profiler to identify bottlenecks
@@ -232,6 +348,21 @@ print(BottleneckAnalyzer.format_report(report))
 ```
 
 ---
+
+### Visualize Trace (CLI)
+```bash
+# Generate HTML timeline from audit log
+python scripts/visualize_trace.py ~/dytopo-logs/task_abc123 --format html --output report.html
+
+# Generate Mermaid flowchart
+python scripts/visualize_trace.py ~/dytopo-logs/task_abc123 --format mermaid
+
+# Enable loop/stall detection
+python scripts/visualize_trace.py ~/dytopo-logs/task_abc123 --detect-loops
+
+# Direct path to audit file
+python scripts/visualize_trace.py ~/dytopo-logs/task_abc123/audit.jsonl --format mermaid --output flow.md
+```
 
 ### View Health Monitor Logs
 ```bash

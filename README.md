@@ -14,6 +14,7 @@
 - 🧠 **Advanced reasoning** — Qwen3-30B MoE (30.5B params, 3.3B active) with hybrid thinking mode
 - 📚 **Hybrid RAG search** — Finds YOUR information better than pure vector search (dense + sparse retrieval)
 - 🤖 **Multi-agent swarm** — DyTopo coordination routes complex tasks to specialized agents that collaborate, with optional RAG context pre-fetch for domain grounding
+- 🛡️ **Reliability hardening** — Checkpoint crash recovery, deny-first policy enforcement, deterministic output verification, stalemate detection
 - 🛠️ **8 MCP servers** — Memory knowledge graph, web search, file operations, sequential thinking, RAG search, multi-agent swarm, system diagnostics
 - 🐋 **Docker-first architecture** — One command to start/stop everything. Auto-restart. Zero networking hassles.
 - 💬 **AnythingLLM UI** — Clean interface for chat, document Q&A, and workspace management
@@ -221,11 +222,14 @@ Reference documentation in `docs/`:
 | `models.py` | Pydantic v2 data models (AgentState, SwarmTask with RAG context field, SwarmMetrics, etc.) |
 | `config.py` | YAML configuration loader with defaults (`dytopo_config.yaml`) |
 | `agents.py` | System prompts, JSON schemas, domain rosters |
-| `router.py` | MiniLM-L6-v2 embedding, cosine similarity, threshold, degree cap |
+| `router.py` | MiniLM-L6-v2 embedding, cosine similarity, threshold, degree cap, intent embedding enrichment, descriptor separation validation |
 | `stigmergic_router.py` | Trace-aware topology: Qdrant-persisted swarm traces, time-decayed boost matrix |
 | `graph.py` | NetworkX DAG construction, cycle breaking, topological sort |
-| `orchestrator.py` | Main swarm loop with singleton inference client, Aegean termination, memory persistence |
-| `governance.py` | Convergence detection, stalling detection, re-delegation, Aegean consensus voting |
+| `orchestrator.py` | Main swarm loop with singleton inference client, Aegean termination, memory persistence; integrates checkpoint, policy, verifier, stalemate modules via guarded imports |
+| `governance.py` | Convergence detection, stalling detection, re-delegation, Aegean consensus voting, stalemate detection with generalist fallback |
+| `checkpoint.py` | CheckpointManager for crash recovery — atomic writes, Pydantic v2 serialization, resume from last good checkpoint |
+| `policy.py` | PolicyEnforcer (PCAS-Lite) — deny-first tool-call policy enforcement with path traversal prevention |
+| `verifier.py` | OutputVerifier for deterministic output verification — syntax check, schema validation, no LLM |
 | `audit.py` | JSONL audit logging to `~/dytopo-logs/{task_id}/` |
 | `health/checker.py` | Pre-run health probes for LLM, Qdrant, AnythingLLM, GPU |
 | `memory/writer.py` | Post-run swarm result persistence to structured storage |
@@ -236,6 +240,7 @@ Reference documentation in `docs/`:
 |-----------|---------|
 | `src/mcp_servers/system_status_mcp.py` | FastMCP server: 6 diagnostic tools (service_health, qdrant_collections, gpu_status, llm_slots, docker_status, stack_config) |
 | `scripts/health_monitor.py` | Standalone sidecar: periodic health checks, auto-restart via `docker restart`, crash window protection (3 attempts/15min), JSONL logging |
+| `scripts/visualize_trace.py` | CLI trace visualizer: generates Mermaid flowcharts and self-contained HTML timelines from audit.jsonl logs, with loop/stall detection |
 
 ---
 
