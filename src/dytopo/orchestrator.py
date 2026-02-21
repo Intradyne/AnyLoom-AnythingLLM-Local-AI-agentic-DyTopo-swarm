@@ -40,7 +40,7 @@ from dytopo.agents import (
     get_role_name,
     get_system_prompt,
 )
-from dytopo.router import build_routing_result, log_routing_round
+from dytopo.router import build_routing_result, build_routing_result_with_hyde, log_routing_round
 from dytopo.stigmergic_router import StigmergicRouter, build_trace_edges
 from dytopo.graph import build_execution_graph, get_execution_order, get_execution_tiers, get_incoming_agents
 from dytopo.governance import (
@@ -745,10 +745,18 @@ async def run_swarm(
                 if trace_ctx.get("boost_applied"):
                     logger.info(f"Round {t}: trace boost applied from {trace_ctx.get('traces_used', 0)} traces")
             else:
-                routing = build_routing_result(
-                    agent_ids, descriptors, swarm.tau, swarm.K_in,
-                    agent_roles=agent_role_map, round_context=round_goal,
-                )
+                hyde_cfg = config.get("hyde", {})
+                if hyde_cfg.get("enabled", False):
+                    routing = await build_routing_result_with_hyde(
+                        agent_ids, descriptors, swarm.tau, swarm.K_in,
+                        hyde_config=hyde_cfg, llm_client=client,
+                        agent_roles=agent_role_map, round_context=round_goal,
+                    )
+                else:
+                    routing = build_routing_result(
+                        agent_ids, descriptors, swarm.tau, swarm.K_in,
+                        agent_roles=agent_role_map, round_context=round_goal,
+                    )
             round_record.edges = routing["edges"]
             round_record.isolated_agents = routing["isolated"]
             round_record.removed_edges = routing["removed_edges"]

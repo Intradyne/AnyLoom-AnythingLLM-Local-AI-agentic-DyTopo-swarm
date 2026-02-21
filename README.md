@@ -222,7 +222,7 @@ Reference documentation in `docs/`:
 | `models.py` | Pydantic v2 data models (AgentState, SwarmTask with RAG context field, SwarmMetrics, etc.) |
 | `config.py` | YAML configuration loader with defaults (`dytopo_config.yaml`) |
 | `agents.py` | System prompts, JSON schemas, domain rosters |
-| `router.py` | MiniLM-L6-v2 embedding, cosine similarity, threshold, degree cap, intent embedding enrichment, descriptor separation validation |
+| `router.py` | MiniLM-L6-v2 embedding, cosine similarity, threshold, degree cap, intent embedding enrichment, descriptor separation validation, optional HyDE (Hypothetical Document Embeddings) for manifold-projected routing |
 | `stigmergic_router.py` | Trace-aware topology: Qdrant-persisted swarm traces, time-decayed boost matrix |
 | `graph.py` | NetworkX DAG construction, cycle breaking, topological sort |
 | `orchestrator.py` | Main swarm loop with singleton inference client, Aegean termination, memory persistence; integrates checkpoint, policy, verifier, stalemate modules via guarded imports |

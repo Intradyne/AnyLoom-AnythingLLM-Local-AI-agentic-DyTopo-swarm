@@ -10,6 +10,9 @@ routing:
   tau: 0.5
   K_in: 3
 
+hyde:
+  enabled: false
+
 orchestration:
   T_max: 5
   convergence_threshold: 0.80

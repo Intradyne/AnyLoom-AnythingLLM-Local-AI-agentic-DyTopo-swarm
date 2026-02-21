@@ -31,6 +31,21 @@ _DEFAULTS = {
         "adaptive_tau": False,
         "broadcast_round_1": True,
     },
+    "hyde": {
+        "enabled": False,
+        "max_tokens": 200,
+        "temperature": 0.3,
+        "prompt_template": (
+            "You are generating a hypothetical ideal response for routing purposes. "
+            "Given the following user query, write a short (~500 character) response "
+            "that a knowledgeable AI agent would produce. Focus on the key concepts, "
+            "technical terms, and domain-specific language that would appear in a "
+            "high-quality answer.\n\n"
+            "User query: {query}\n\n"
+            "Respond with ONLY the hypothetical answer, no preamble."
+        ),
+        "fallback_on_failure": True,
+    },
     "orchestration": {
         "T_max": 5,
         "descriptor_mode": "combined",

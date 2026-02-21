@@ -6,14 +6,24 @@ Embedding, similarity matrix computation, thresholding, and degree cap enforceme
 
 Key constraint: Uses MiniLM-L6-v2 (22M params, 384-dim) on CPU.
 Tiny model (~80 MB), not worth GPU overhead.  BGE-M3 (used for RAG) is NOT used for routing.
+
+Optional HyDE (Hypothetical Document Embeddings) mode: projects agent queries onto the
+descriptor manifold by generating a hypothetical ideal response before embedding.
 """
 
+from __future__ import annotations
+
+import asyncio
 import json
 import logging
+import time
 import numpy as np
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from inference.llm_client import InferenceClient
 
 logger = logging.getLogger("dytopo.router")
 
@@ -305,6 +315,217 @@ def validate_descriptor_separation(
 
     mean_sim = float(S[S > 0].mean()) if (S > 0).any() else 0.0
     return {"warnings": warnings, "mean_similarity": mean_sim}
+
+
+# ---------------------------------------------------------------------------
+# HyDE (Hypothetical Document Embeddings)
+# ---------------------------------------------------------------------------
+
+async def generate_hyde_response(
+    query: str,
+    hyde_config: dict,
+    llm_client: InferenceClient,
+) -> Optional[str]:
+    """Generate a hypothetical ideal agent response for a query.
+
+    Uses the LLM to produce a short response in "agent language" so that
+    the embedding lands in the same semantic neighborhood as agent descriptors.
+
+    Args:
+        query: The agent's query descriptor text
+        hyde_config: Dict with prompt_template, max_tokens, temperature
+        llm_client: The inference client instance
+
+    Returns:
+        Hypothetical response string, or None on failure (caller falls back)
+    """
+    template = hyde_config.get(
+        "prompt_template",
+        "Given this query, write a short ideal response:\n\n{query}",
+    )
+    prompt_text = template.format(query=query)
+    # Prefix with /no_think for Qwen3 speed (skips chain-of-thought)
+    prompt_text = f"/no_think\n{prompt_text}"
+
+    try:
+        result = await llm_client.chat_completion(
+            messages=[{"role": "user", "content": prompt_text}],
+            agent_id="hyde_router",
+            temperature=hyde_config.get("temperature", 0.3),
+            max_tokens=hyde_config.get("max_tokens", 200),
+            timeout=30.0,
+        )
+        hypothetical = result.content.strip()
+        if hypothetical:
+            logger.debug(f"HyDE generated ({len(hypothetical)} chars) for query: {query[:60]}...")
+            return hypothetical
+        logger.warning("HyDE returned empty response, falling back to raw query")
+        return None
+    except Exception as e:
+        logger.warning(f"HyDE generation failed ({e}), falling back to raw query")
+        return None
+
+
+async def hyde_embed_descriptors(
+    agent_ids: list[str],
+    descriptors: dict[str, dict],
+    hyde_config: dict,
+    llm_client: InferenceClient,
+    agent_roles: dict[str, str] | None = None,
+    round_context: str = "",
+) -> tuple[np.ndarray, np.ndarray]:
+    """Embed descriptors with HyDE-transformed queries.
+
+    Keys are embedded directly (already in agent language).
+    Queries are projected through HyDE: the LLM generates a hypothetical
+    ideal response, which is then embedded instead of the raw query.
+
+    Falls back to raw query embedding per-agent if HyDE fails for that agent.
+
+    Args:
+        agent_ids: Ordered list of agent IDs
+        descriptors: Dict mapping agent_id to {"key": str, "query": str}
+        hyde_config: HyDE configuration dict
+        llm_client: Inference client for hypothetical generation
+        agent_roles: Optional dict mapping agent_id to role name for enrichment
+        round_context: Optional round context string for enrichment
+
+    Returns:
+        Tuple of (key_vectors, query_vectors), both shape (N, dim), dtype float32
+    """
+    model = _get_routing_model()
+
+    # Generate HyDE hypotheticals for all queries concurrently
+    start = time.perf_counter()
+    hyde_tasks = []
+    for aid in agent_ids:
+        raw_query = descriptors[aid]["query"]
+        hyde_tasks.append(generate_hyde_response(raw_query, hyde_config, llm_client))
+
+    hyde_results = await asyncio.gather(*hyde_tasks, return_exceptions=True)
+    hyde_ms = (time.perf_counter() - start) * 1000
+
+    succeeded = sum(1 for r in hyde_results if isinstance(r, str) and r)
+    logger.info(
+        f"HyDE generation: {succeeded}/{len(agent_ids)} succeeded in {hyde_ms:.0f}ms"
+    )
+
+    # Build text lists for embedding
+    keys = []
+    queries = []
+    for idx, aid in enumerate(agent_ids):
+        key_text = descriptors[aid]["key"]
+        raw_query = descriptors[aid]["query"]
+
+        # Use HyDE result if available, otherwise fall back to raw query
+        hyde_result = hyde_results[idx]
+        if isinstance(hyde_result, str) and hyde_result:
+            query_text = hyde_result
+        else:
+            query_text = raw_query
+
+        # Apply enrichment (role prefix, round context)
+        if agent_roles and aid in agent_roles:
+            key_text = prepare_descriptor_for_embedding(key_text, agent_roles[aid], round_context)
+            query_text = prepare_descriptor_for_embedding(query_text, agent_roles[aid], round_context)
+
+        keys.append(key_text)
+        queries.append(query_text)
+
+    # Batch encode — all keys then all queries in one call
+    all_texts = keys + queries
+    all_vectors = model.encode(
+        all_texts,
+        normalize_embeddings=True,
+        show_progress_bar=False,
+        convert_to_numpy=True,
+    )
+
+    N = len(agent_ids)
+    key_vectors = all_vectors[:N]
+    query_vectors = all_vectors[N:]
+
+    return key_vectors.astype(np.float32), query_vectors.astype(np.float32)
+
+
+async def build_routing_result_with_hyde(
+    agent_ids: list[str],
+    descriptors: dict[str, dict],
+    tau: float,
+    K_in: int,
+    hyde_config: dict,
+    llm_client: InferenceClient,
+    agent_roles: dict[str, str] | None = None,
+    round_context: str = "",
+) -> dict:
+    """Full routing pipeline with HyDE: generate hypotheticals → embed → similarity → threshold → degree cap.
+
+    Same return signature as build_routing_result(). Falls back to direct
+    matching if HyDE fails globally and fallback_on_failure is True.
+
+    Args:
+        agent_ids: Ordered list of agent IDs
+        descriptors: Dict mapping agent_id to {"key": str, "query": str}
+        tau: Similarity threshold
+        K_in: Max incoming edges per agent
+        hyde_config: HyDE configuration dict
+        llm_client: Inference client for hypothetical generation
+        agent_roles: Optional dict mapping agent_id to role name for enrichment
+        round_context: Optional round context string for enrichment
+
+    Returns:
+        Dict with same keys as build_routing_result()
+    """
+    try:
+        key_vecs, query_vecs = await hyde_embed_descriptors(
+            agent_ids, descriptors, hyde_config, llm_client,
+            agent_roles=agent_roles, round_context=round_context,
+        )
+    except Exception as e:
+        if hyde_config.get("fallback_on_failure", True):
+            logger.warning(f"HyDE embedding failed ({e}), falling back to direct match")
+            return build_routing_result(
+                agent_ids, descriptors, tau, K_in,
+                agent_roles=agent_roles, round_context=round_context,
+            )
+        raise
+
+    S = compute_similarity_matrix(query_vecs, key_vecs)
+    A = apply_threshold(S, tau)
+    A, removed_idx = enforce_max_indegree(A, S, K_in)
+
+    N = len(agent_ids)
+    edges = []
+    for i in range(N):
+        for j in range(N):
+            if A[i][j] == 1:
+                edges.append((agent_ids[j], agent_ids[i], float(S[i][j])))
+
+    isolated = [agent_ids[i] for i in range(N) if A[i].sum() == 0]
+    removed_named = [(agent_ids[i], agent_ids[j]) for i, j in removed_idx]
+
+    active_sims = S[A == 1] if A.sum() > 0 else np.array([0.0])
+    stats = {
+        "edge_count": int(A.sum()),
+        "max_possible_edges": N * (N - 1),
+        "density": float(A.sum()) / max(1, N * (N - 1)),
+        "mean_similarity": float(S[S > 0].mean()) if (S > 0).any() else 0.0,
+        "max_similarity": float(S.max()),
+        "min_active_similarity": float(active_sims.min()) if len(active_sims) > 0 else 0.0,
+        "isolated_count": len(isolated),
+        "removed_edge_count": len(removed_idx),
+        "hyde_enabled": True,
+    }
+
+    return {
+        "agent_ids": agent_ids,
+        "similarity_matrix": S,
+        "adjacency_matrix": A,
+        "edges": edges,
+        "isolated": isolated,
+        "removed_edges": removed_named,
+        "stats": stats,
+    }
 
 
 def log_routing_round(

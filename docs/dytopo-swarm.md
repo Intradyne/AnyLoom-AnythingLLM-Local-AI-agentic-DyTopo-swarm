@@ -13,7 +13,7 @@ DyTopo is a standalone Python package at `src/dytopo/` with 12 core modules and 
 | `models.py` | Pydantic v2 data models: `AgentRole`, `SwarmDomain`, `AgentDescriptor`, `AgentState`, `AgentMetrics`, `SwarmMetrics`, `RoundRecord`, `ManagerDecision`, `SwarmStatus`, `SwarmTask`, `SwarmMemoryRecord`, `HealthStatus`, `StackHealth`, `AegeanVote` |
 | `config.py` | YAML configuration loader — merges `dytopo_config.yaml` over built-in `_DEFAULTS`; includes `concurrency` section for backend selection |
 | `agents.py` | System prompts keyed by `(SwarmDomain, AgentRole)`, JSON schemas (`DESCRIPTOR_SCHEMA`, `AGENT_OUTPUT_SCHEMA`, `MANAGER_OUTPUT_SCHEMA`), prompt templates, `build_agent_roster()`, `get_system_prompt()`, `get_role_name()`, `get_worker_names()` |
-| `router.py` | Lazy singleton MiniLM-L6-v2, `embed_descriptors()`, `compute_similarity_matrix()`, `apply_threshold()`, `enforce_max_indegree()`, `build_routing_result()`, `log_routing_round()`, `prepare_descriptor_for_embedding()` (intent enrichment), `validate_descriptor_separation()` |
+| `router.py` | Lazy singleton MiniLM-L6-v2, `embed_descriptors()`, `compute_similarity_matrix()`, `apply_threshold()`, `enforce_max_indegree()`, `build_routing_result()`, `log_routing_round()`, `prepare_descriptor_for_embedding()` (intent enrichment), `validate_descriptor_separation()`. HyDE support: `generate_hyde_response()`, `hyde_embed_descriptors()`, `build_routing_result_with_hyde()` — projects agent queries through hypothetical LLM generation before embedding, configurable via `hyde` config section |
 | `stigmergic_router.py` | `StigmergicRouter` class wrapping functional routing with trace-aware topology: `build_topology()` (blends similarity matrix with time-decayed historical trace boost), `deposit_trace()` (persists swarm routing patterns to Qdrant `swarm_traces` collection), `get_trace_stats()`, `prune_old_traces()`. `build_trace_edges()` helper converts routing edges to trace format. Uses 384-dim MiniLM-L6-v2 embeddings, configurable via `traces` section in config |
 | `graph.py` | `build_execution_graph()` (NetworkX DiGraph), `break_cycles()` (greedy lowest-weight removal), `get_execution_order()` (Kahn's with alphabetical tiebreak), `get_execution_tiers()` (parallel-within-tier ordering via `nx.topological_generations()`), `get_incoming_agents()` |
 | `orchestrator.py` | Backend-agnostic LLM client via `_get_llm_client()` (connects to llama.cpp on port 8008), semaphore-based concurrency via `_get_semaphore()` (8 concurrent), `_llm_call()` with tenacity retry (3 attempts, exponential backoff), `_call_manager()`, `_call_worker()`, `run_swarm()` main loop with parallelized phases via `asyncio.gather()`. Integrates checkpoint, policy, verifier, and stalemate modules via guarded imports (`_HAS_CHECKPOINT`, `_HAS_STALEMATE`, `_HAS_VERIFIER`, `_HAS_POLICY` flags) |
@@ -48,8 +48,13 @@ llm:
   # temperature_descriptor: 0.1
   # temperature_manager: 0.1
 routing:
-  tau: 0.3
+  tau: 0.5
   K_in: 3
+hyde:
+  enabled: false             # HyDE: hypothetical doc generation before routing
+  # max_tokens: 200
+  # temperature: 0.3
+  # fallback_on_failure: true
 orchestration:
   T_max: 5
 concurrency:
