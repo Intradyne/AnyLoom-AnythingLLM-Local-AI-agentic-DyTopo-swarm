@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/intradyne-anyloom-anythingllm-local-ai-agentic-dytopo-swarm-badge.png)](https://mseep.ai/app/intradyne-anyloom-anythingllm-local-ai-agentic-dytopo-swarm)
+
 # AnyLoom: AnythingLLM Local AI Agentic Stack
 
 **A fully local, multi-agent AI system that gives you ChatGPT-level intelligence with complete privacy and control over your data.**
